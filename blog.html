@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>emomaxd — low-level perf & compilers</title>
+  <title>Emre Cecanpunar — Blog</title>
   <meta name="description" content="Portfolio and blog on perf, low-latency systems, and instruction-level optimization." />
   <style>
     :root{
@@ -74,8 +74,9 @@
       <div class="brand">
         <div class="logo">EM</div>
         <div>
-          <h1>emomaxd — low-level perf & compilers</h1>
-          <p class="lead">portfolio + blog on instruction-latency, profiling, and system tuning.</p>
+          <h1>Emre Cecanpunar - Blog</h1>
+          <p class="lead">Blog on performance engineering, system tuning and
+	  low-level concepts.</p>
         </div>
       </div>
       <nav>
@@ -84,9 +85,39 @@
     </header>
 
 <section id="posts" class="posts">
+  <!-- Pinned Post -->
+  <article class="post" style="border-left: 3px solid var(--accent); background: linear-gradient(135deg, var(--panel), rgba(123, 211, 137, 0.03));">
+    <h3>
+      <span style="color: var(--accent); font-size: 12px; font-weight: 500; margin-right: 8px;">📌 PINNED</span>
+      <a href="posts/low-level-optimizations.html" style="color:inherit;text-decoration:none;">Low-Level CPU Optimization: A Comprehensive Analysis of Modern Performance Engineering Techniques</a>
+    </h3>
+    <div class="meta"><span>Aug 14, 2025</span></div>
+    <div class="tags">
+      <span class="tag">low-level</span>
+      <span class="tag">ISA</span>
+      <span class="tag">computer-architecture</span>
+      <span class="tag">assembly</span>
+      <span class="tag">optimization</span>
+      <span class="tag">performance-engineering</span>
+    </div>
+    <p class="meta">Comprehensive guide to instruction & architecture level extreme performance optimizations.</p>
+    <div style="display: flex; gap: 12px; margin-top: 10px;">
+      <a href="posts/low-level-optimizations.html" class="readmore">Read Article →</a>
+      <a href="https://github.com/emomaxd/low-level-cpu-optimization" class="readmore" style="color: var(--muted);">GitHub Repo →</a>
+    </div>
+  </article>
+
   <article class="post">
     <h3><a href="posts/effective-cache.html" style="color:inherit;text-decoration:none;">Better Cache Usage: reducing misses & improving locality</a></h3>
-    <div class="meta"><span>Jul 3, 2025</span> · <span>~9 min read</span></div>
+    <div class="meta"><span>Jul 3, 2025</span></div>
+    <div class="tags"><span class="tag">cache</span><span class="tag">locality</span></div>
+    <p class="meta">Leverage spatial and temporal locality, prefetching, and data layout tuning to minimize stalls.</p>
+    <a href="posts/effective-cache.html" class="readmore">Read more →</a>
+  </article>
+
+  <article class="post">
+    <h3><a href="posts/effective-cache.html" style="color:inherit;text-decoration:none;">Better Cache Usage: reducing misses & improving locality</a></h3>
+    <div class="meta"><span>Jul 3, 2025</span></div>
     <div class="tags"><span class="tag">cache</span><span class="tag">locality</span></div>
     <p class="meta">Leverage spatial and temporal locality, prefetching, and data layout tuning to minimize stalls.</p>
     <a href="posts/effective-cache.html" class="readmore">Read more →</a>
@@ -94,7 +125,7 @@
 
   <article class="post">
     <h3><a href="posts/effective-tlb.html" style="color:inherit;text-decoration:none;">Effective TLB Usage: keeping address translation fast</a></h3>
-    <div class="meta"><span>Jun 20, 2025</span> · <span>~8 min read</span></div>
+    <div class="meta"><span>Jun 20, 2025</span></div>
     <div class="tags"><span class="tag">tlb</span><span class="tag">memory</span></div>
     <p class="meta">Page size choices, access patterns, and layout strategies to avoid TLB thrashing.</p>
     <a href="posts/effective-tlb.html" class="readmore">Read more →</a>
@@ -102,7 +133,7 @@
 
   <article class="post">
     <h3><a href="posts/strength-reduction.html" style="color:inherit;text-decoration:none;">Strength Reduction: replacing expensive ops with cheaper ones</a></h3>
-    <div class="meta"><span>Aug 10, 2025</span> · <span>~6 min read</span></div>
+    <div class="meta"><span>Aug 10, 2025</span></div>
     <div class="tags"><span class="tag">optimization</span><span class="tag">compiler</span></div>
     <p class="meta">From modulo to bitwise ops — compiler transformations and manual tricks for tighter loops.</p>
     <a href="posts/strength-reduction.html" class="readmore">Read more →</a>
@@ -110,7 +141,7 @@
 
   <article class="post">
     <h3><a href="posts/avoiding-branches.html" style="color:inherit;text-decoration:none;">Avoiding Branches in Hot Paths</a></h3>
-    <div class="meta"><span>Jul 28, 2025</span> · <span>~7 min read</span></div>
+    <div class="meta"><span>Jul 28, 2025</span></div>
     <div class="tags"><span class="tag">branchless</span><span class="tag">perf</span></div>
     <p class="meta">Minimize branch mispredictions with conditional moves, bitwise masking, and LUT techniques.</p>
     <a href="posts/avoiding-branches.html" class="readmore">Read more →</a>
@@ -118,7 +149,7 @@
 
   <article class="post">
     <h3><a href="posts/false-sharing.html" style="color:inherit;text-decoration:none;">False Sharing: the silent cache killer</a></h3>
-    <div class="meta"><span>Jul 15, 2025</span> · <span>~8 min read</span></div>
+    <div class="meta"><span>Jul 15, 2025</span></div>
     <div class="tags"><span class="tag">cache</span><span class="tag">multithreading</span></div>
     <p class="meta">Understanding and eliminating cache line contention between threads for consistent performance.</p>
     <a href="posts/false-sharing.html" class="readmore">Read more →</a>
