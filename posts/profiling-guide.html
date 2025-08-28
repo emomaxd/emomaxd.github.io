@@ -1,0 +1,476 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Performance Profiling Deep Dive</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .benchmark {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>Performance Profiling Deep Dive</h1>
+    <div class="meta">2025-04-30 • ~8 min read</div>
+    
+    <p>Intuition lies. Guesswork wastes time. Hardware performance counters reveal truth. perf, VTune, flame graphs, and custom instrumentation turn performance mysteries into actionable data.</p>
+
+    <h2>Hardware Performance Counters</h2>
+    <p>Modern CPUs expose hundreds of performance events:</p>
+
+    <pre>// Key performance counters
+cycles:                Total CPU cycles
+instructions:          Instructions retired  
+cache-misses:          L1/L2/L3 cache misses
+branch-misses:         Branch mispredictions
+dTLB-load-misses:      Data TLB misses
+page-faults:           Memory management faults
+
+// Derived metrics
+IPC = instructions / cycles           # Instructions per cycle
+CPI = cycles / instructions          # Cycles per instruction  
+Branch MPKI = branch_misses / (instructions/1000)
+Cache MPKI = cache_misses / (instructions/1000)
+
+// Intel-specific counters
+fp_arith_inst_retired.scalar_single:     Scalar float operations
+fp_arith_inst_retired.256b_packed_single: AVX vector operations
+ld_blocks.store_forward:                 Store forwarding blocks
+mem_load_retired.l3_miss:                L3 cache misses
+resource_stalls.any:                     Pipeline resource stalls</pre>
+
+    <h2>perf - The Swiss Army Knife</h2>
+    <p>Linux perf handles everything from basic stats to detailed analysis:</p>
+
+    <pre># Basic performance overview
+perf stat ./program
+# Shows cycles, instructions, cache misses, branch misses
+
+# Specific counters
+perf stat -e cycles,instructions,cache-misses,branch-misses ./program
+
+# CPU utilization breakdown  
+perf stat -e task-clock,context-switches,cpu-migrations ./program
+
+# Memory subsystem analysis
+perf stat -e cache-references,cache-misses,\
+dTLB-loads,dTLB-load-misses,\
+node-loads,node-load-misses ./program
+
+# Branch prediction analysis
+perf stat -e branches,branch-misses,\
+br_inst_retired.all_branches,\
+br_misp_retired.all_branches ./program
+
+# Record and analyze hotspots
+perf record -g --call-graph=dwarf ./program
+perf report --stdio
+# Shows call stack and time distribution
+
+# System-wide profiling
+sudo perf record -a -g sleep 10  # Profile entire system
+perf report</pre>
+
+    <h2>Intel VTune Profiler</h2>
+    <p>Industry-standard microarchitecture analysis:</p>
+
+    <pre># VTune collection types
+vtune -collect hotspots ./program
+# CPU usage, hotspots, call stacks
+
+vtune -collect memory-access ./program  
+# Memory access patterns, NUMA analysis
+
+vtune -collect microarchitecture ./program
+# Pipeline analysis, execution units
+
+vtune -collect threading ./program
+# Lock contention, thread synchronization
+
+vtune -collect gpu-hotspots ./program
+# GPU kernel analysis (CUDA/OpenCL)
+
+# Advanced microarchitecture analysis
+vtune -collect microarchitecture -knob analyze-openmp=true ./program
+
+# Memory bandwidth analysis  
+vtune -collect memory-access -knob analyze-mem-objects=true ./program
+
+# View results
+vtune -report hotspots -r ./result_dir
+vtune -report summary -r ./result_dir</pre>
+
+    <h2>Flame Graphs</h2>
+    <p>Visualize call stacks and time distribution:</p>
+
+    <pre># Generate flame graph data
+perf record -F 997 -g ./program  # 997 Hz sampling
+perf script > out.perf
+
+# Process with FlameGraph tools
+git clone https://github.com/brendangregg/FlameGraph
+./FlameGraph/stackcollapse-perf.pl out.perf > out.folded  
+./FlameGraph/flamegraph.pl out.folded > flamegraph.svg
+
+# Alternative: perf directly
+perf record -g ./program
+perf script report flamegraph
+
+# Differential flame graphs (compare before/after)
+perf record -g ./program_before
+perf record -g ./program_after
+# Generate differential view to see improvements/regressions</pre>
+
+    <h2>Custom Instrumentation</h2>
+    <p>Add your own timing and counters:</p>
+
+    <pre>// High-resolution timing
+class Timer {
+    uint64_t start_cycles;
+    
+public:
+    Timer() : start_cycles(__rdtsc()) {}
+    
+    uint64_t elapsed_cycles() const {
+        return __rdtsc() - start_cycles;
+    }
+    
+    double elapsed_seconds() const {
+        return elapsed_cycles() / cpu_frequency_hz;
+    }
+};
+
+// Usage
+void performance_critical_function() {
+    Timer timer;
+    
+    // Critical code here...
+    
+    uint64_t cycles = timer.elapsed_cycles();
+    printf("Function took %lu cycles\n", cycles);
+}
+
+// Statistical profiling
+class ProfilerStats {
+    std::string name;
+    uint64_t total_cycles = 0;
+    uint64_t call_count = 0;
+    uint64_t min_cycles = UINT64_MAX;
+    uint64_t max_cycles = 0;
+    
+public:
+    void record(uint64_t cycles) {
+        total_cycles += cycles;
+        call_count++;
+        min_cycles = std::min(min_cycles, cycles);
+        max_cycles = std::max(max_cycles, cycles);
+    }
+    
+    void report() const {
+        uint64_t avg = call_count ? total_cycles / call_count : 0;
+        printf("%s: avg=%lu min=%lu max=%lu calls=%lu\n",
+               name.c_str(), avg, min_cycles, max_cycles, call_count);
+    }
+};
+
+// Scoped profiler
+#define PROFILE_SCOPE(name) \
+    static ProfilerStats stats(name); \
+    Timer timer; \
+    defer { stats.record(timer.elapsed_cycles()); }</pre>
+
+    <h2>Memory Profiling</h2>
+    <p>Track allocations, leaks, and access patterns:</p>
+
+    <pre># Valgrind memory analysis
+valgrind --tool=memcheck ./program         # Memory errors, leaks
+valgrind --tool=cachegrind ./program       # Cache simulation
+valgrind --tool=callgrind ./program        # Call graph with costs
+valgrind --tool=massif ./program           # Heap profiler
+
+# AddressSanitizer (faster than Valgrind)  
+gcc -fsanitize=address -g ./program
+./program  # Detects buffer overflows, use-after-free
+
+# HeapTrack (allocation profiler)
+heaptrack ./program
+heaptrack_gui heaptrack.program.pid.gz
+
+# Custom allocation tracking
+class AllocationTracker {
+    std::atomic<size_t> total_allocated{0};
+    std::atomic<size_t> peak_allocated{0};
+    std::atomic<size_t> alloc_count{0};
+    
+public:
+    void record_alloc(size_t size) {
+        total_allocated += size;
+        alloc_count++;
+        
+        size_t current = total_allocated.load();
+        size_t expected = peak_allocated.load();
+        while (current > expected && 
+               !peak_allocated.compare_exchange_weak(expected, current)) {
+            expected = peak_allocated.load();
+        }
+    }
+    
+    void record_free(size_t size) {
+        total_allocated -= size;
+    }
+    
+    void report() const {
+        printf("Peak allocation: %zu bytes, Total allocs: %zu\n",
+               peak_allocated.load(), alloc_count.load());
+    }
+};</pre>
+
+    <h2>Sampling vs Instrumentation</h2>
+    <p>Different profiling approaches for different use cases:</p>
+
+    <pre>// Sampling profilers (perf, VTune)
+Pros:
++ Low overhead (~1-5%)
++ Works with any program
++ Statistical accuracy
++ System-wide profiling
+
+Cons:  
+- May miss rare events
+- Limited precision
+- Requires symbols for call stacks
+
+// Instrumentation profilers (custom timers)
+Pros:
++ Exact measurements  
++ Custom metrics
++ Zero sampling noise
++ Function-level precision
+
+Cons:
+- Higher overhead (5-50%)
+- Requires code modification
+- Can change behavior (Heisenbug)
+- May miss system effects
+
+// Hybrid approach
+#ifdef PROFILING_ENABLED
+#define INSTRUMENT_FUNCTION() Timer __timer(__FUNCTION__)
+#else  
+#define INSTRUMENT_FUNCTION() 
+#endif
+
+void hot_function() {
+    INSTRUMENT_FUNCTION();  // Only in profiling builds
+    // Function implementation...
+}</pre>
+
+    <h2>Bottleneck Identification</h2>
+    <p>Systematic approach to finding performance problems:</p>
+
+    <pre>// Performance analysis workflow
+1. Measure baseline performance
+2. Profile with sampling profiler (perf/VTune)
+3. Identify hot functions (80/20 rule)
+4. Analyze microarchitecture (IPC, cache misses, branches)
+5. Add detailed instrumentation to hot paths
+6. Optimize based on data
+7. Measure improvement
+
+// Common bottleneck patterns
+CPU-bound:     High IPC, low cache misses
+Memory-bound:  Low IPC, high cache misses  
+Branch-bound:  High branch misprediction rate
+Sync-bound:    High context switches, lock contention
+
+// Example: diagnosing matrix multiplication
+perf stat -e cycles,instructions,cache-misses,branch-misses ./matmul
+
+# Results analysis:
+# IPC = 0.8 (low) → CPU not fully utilized
+# Cache MPKI = 50 (high) → Memory bottleneck
+# Branch MPKI = 5 (low) → Branches not the issue
+# Conclusion: Optimize memory access patterns</pre>
+
+    <h2>Continuous Integration Profiling</h2>
+    <p>Automated performance regression detection:</p>
+
+    <pre>// Benchmark harness
+class PerformanceBenchmark {
+    std::vector<uint64_t> measurements;
+    
+public:
+    void run_benchmark(std::function<void()> workload, int iterations = 100) {
+        measurements.clear();
+        measurements.reserve(iterations);
+        
+        // Warmup
+        for (int i = 0; i < 10; i++) workload();
+        
+        // Actual measurements
+        for (int i = 0; i < iterations; i++) {
+            Timer timer;
+            workload();
+            measurements.push_back(timer.elapsed_cycles());
+        }
+    }
+    
+    Statistics get_stats() const {
+        std::vector<uint64_t> sorted = measurements;
+        std::sort(sorted.begin(), sorted.end());
+        
+        return {
+            .min = sorted.front(),
+            .max = sorted.back(), 
+            .median = sorted[sorted.size() / 2],
+            .mean = std::accumulate(sorted.begin(), sorted.end(), 0UL) / sorted.size(),
+            .p95 = sorted[sorted.size() * 95 / 100],
+            .p99 = sorted[sorted.size() * 99 / 100]
+        };
+    }
+};
+
+// CI integration
+void performance_test() {
+    PerformanceBenchmark bench;
+    
+    bench.run_benchmark([]() { 
+        critical_algorithm(); 
+    });
+    
+    auto stats = bench.get_stats();
+    
+    // Regression detection (compare with baseline)
+    const uint64_t baseline_median = load_baseline("critical_algorithm");
+    double regression = (double)stats.median / baseline_median;
+    
+    if (regression > 1.05) {  // 5% regression threshold
+        throw std::runtime_error("Performance regression detected");
+    }
+}</pre>
+
+    <h2>Platform-Specific Tools</h2>
+    <p>Each platform has specialized profiling tools:</p>
+
+    <pre># Windows
+Visual Studio Diagnostics:  Built-in CPU/memory profiler
+PerfView:                   ETW-based system profiler  
+Application Verifier:       Heap corruption detection
+VMMap:                      Virtual memory analysis
+
+# macOS  
+Instruments:               Xcode profiling suite
+dtrace:                    Dynamic tracing framework
+sample:                    Command-line sampling profiler
+vmmap:                     Memory mapping analysis
+
+# Android
+systrace/perfetto:         System-wide tracing
+simpleperf:               Android perf equivalent  
+GPU profilers:             Mali, Adreno tools
+
+# GPU profiling
+NVIDIA Nsight:             CUDA kernel profiling
+AMD CodeXL:                OpenCL/HSA profiling
+Intel Graphics Profiler:   GPU performance analysis</pre>
+
+    <h2>Profiling Overhead</h2>
+    <p>Every profiler adds overhead—choose appropriately:</p>
+
+    <pre>// Profiler overhead comparison
+No profiling:        0% overhead
+perf (sampling):     1-5% overhead
+VTune (sampling):    2-8% overhead  
+Callgrind:           10-50x slowdown
+Custom instrumentation: 5-50% overhead
+AddressSanitizer:    2-3x slowdown
+Valgrind memcheck:   10-30x slowdown
+
+// Minimize profiling overhead
+1. Use sampling for hot path identification
+2. Add instrumentation only to suspected bottlenecks  
+3. Use conditional compilation for custom profiling
+4. Profile representative workloads, not toy examples
+5. Run multiple iterations for statistical significance</pre>
+
+    <div class="benchmark">
+        <strong>Profiling workflow example (slow matrix multiply)</strong><br>
+        Initial performance: <strong>2.1s</strong><br>
+        perf analysis: IPC=0.8, 45% cache misses → memory-bound<br>
+        After cache blocking: <strong>0.8s</strong> (2.6x speedup)<br>
+        VTune analysis: 23% time in inner loop, poor vectorization<br>
+        After SIMD optimization: <strong>0.3s</strong> (7x speedup)<br>
+        Data-driven optimization beats guesswork.
+    </div>
+
+    <h2>Advanced Profiling Techniques</h2>
+    <p>Deep analysis for complex performance problems:</p>
+
+    <pre># Intel Processor Trace (PT)
+perf record -e intel_pt/cyc=1/u ./program
+# Records complete execution trace - massive data
+
+# Last Branch Record (LBR)  
+perf record -j any,u ./program
+# Records recent branch history
+
+# Precise Event-Based Sampling (PEBS)
+perf record -e mem_load_retired.l3_miss:pp ./program  
+# Precise memory access profiling
+
+# Statistical profiling with perf
+perf record -F 4000 -g ./program    # 4000 Hz sampling
+perf annotate function_name          # Assembly-level analysis
+
+# Hardware event correlation
+perf stat -e cycles,instructions,cache-misses,\
+mem_load_retired.l1_miss,\
+mem_load_retired.l2_miss,\
+mem_load_retired.l3_miss ./program</pre>
+
+    <h2>Bottom Line</h2>
+    <p>Performance intuition fails. Profiling reveals truth. Use sampling profilers for hot spot identification. Hardware counters expose microarchitecture bottlenecks. Custom instrumentation provides precise timing. Flame graphs visualize call stack costs. Automate performance testing in CI. Profile representative workloads, not microbenchmarks. Data-driven optimization beats random guessing every time.</p>
+
+    <p><a href="../index.html">← Back</a></p>
+</body>
+</html>
