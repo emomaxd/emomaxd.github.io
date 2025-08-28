@@ -62,29 +62,17 @@
     <div class="header">
         <h1>Emre Cecanpunar</h1>
         <div class="meta contact">
-            Contact: emreleno@gmail.com | <a href="cv.pdf">CV</a> | <a href="https://github.com/emomaxd">GitHub</a>
+            Contact: emreleno@gmail.com | <a href="https://github.com/emomaxd">GitHub</a>
         </div>
     </div>
     <div class="meta">operating systems, low-level graphics & systems, performance engineering</div>
 
     <h2>Recent Posts</h2>
-    
-    <div class="post">
-        <h3><a href="posts/cpu-optimization.html">Advanced CPU Optimization Techniques</a></h3>
-        <div class="meta">2025-08-14</div>
-        <p>Instruction-level optimization, cache-friendly algorithms, and architectural considerations for modern processors. Covers SIMD utilization, memory hierarchies, and compiler intrinsics.</p>
-    </div>
 
     <div class="post">
-        <h3><a href="posts/strength-reduction.html">Strength Reduction in Critical Paths</a></h3>
-        <div class="meta">2025-08-10</div>
-        <p>Replacing expensive operations with cheaper equivalents. Division by multiplication, modulo with bitwise AND, and other algebraic transformations.</p>
-    </div>
-
-    <div class="post">
-        <h3><a href="posts/branch-prediction.html">Branch Prediction and Control Flow</a></h3>
-        <div class="meta">2025-07-28</div>
-        <p>Minimizing branch mispredictions through code restructuring, conditional moves, and understanding predictor behavior.</p>
+        <h3><a href="posts/cpu-microarchitecture.html">CPU Microarchitecture Deep Dive</a></h3>
+        <div class="meta">2025-08-28</div>
+        <p>Pipeline stages, out-of-order execution, branch prediction, register renaming, and hardware memory reordering. How modern CPUs actually execute your code under the hood.</p>
     </div>
 
     <div class="post">
@@ -94,27 +82,9 @@
     </div>
 
     <div class="post">
-        <h3><a href="posts/vectorization.html">Auto-Vectorization and SIMD</a></h3>
-        <div class="meta">2025-05-25</div>
-        <p>Compiler vectorization hints, intrinsics usage, and loop transformations for maximum SIMD utilization across x86, ARM, and GPU architectures.</p>
-    </div>
-
-    <div class="post">
-        <h3><a href="posts/lock-free.html">Lock-Free Data Structures</a></h3>
-        <div class="meta">2025-05-12</div>
-        <p>Compare-and-swap primitives, memory ordering, and ABA problem solutions in high-performance concurrent programming.</p>
-    </div>
-
-    <div class="post">
-        <h3><a href="posts/profiling-guide.html">Performance Profiling Deep Dive</a></h3>
-        <div class="meta">2025-04-30</div>
-        <p>Hardware performance counters, flame graphs, and bottleneck identification using perf, Intel VTune, and custom instrumentation.</p>
-    </div>
-
-    <div class="post">
-        <h3><a href="posts/gpu-compute.html">GPU Compute Optimization</a></h3>
-        <div class="meta">2025-04-18</div>
-        <p>CUDA kernel optimization, memory coalescing, occupancy analysis, and cross-platform compute shader techniques.</p>
+        <h3><a href="posts/branch-prediction.html">Branch Prediction and Control Flow</a></h3>
+        <div class="meta">2025-07-28</div>
+        <p>Minimizing branch mispredictions through code restructuring, conditional moves, and understanding predictor behavior.</p>
     </div>
 
     <div class="post">
@@ -122,6 +92,51 @@
         <div class="meta">2025-04-05</div>
         <p>Understanding GCC and Clang optimization passes, PGO implementation details, and when to use assembly for critical sections.</p>
     </div>
+
+    <div class="post">
+        <h3><a href="posts/vectorization.html">Auto-Vectorization and SIMD</a></h3>
+        <div class="meta">2025-05-25</div>
+        <p>Compiler vectorization hints, intrinsics usage, and loop transformations for maximum SIMD utilization across x86, ARM, and GPU architectures.</p>
+    </div>
+
+    <div class="post">
+        <h3><a href="posts/strength-reduction.html">Strength Reduction in Critical Paths</a></h3>
+        <div class="meta">2025-08-10</div>
+        <p>Replacing expensive operations with cheaper equivalents. Division by multiplication, modulo with bitwise AND, and other algebraic transformations.</p>
+    </div>
+
+    <div class="post">
+        <h3><a href="posts/threading.html">Threading, Parallelism and Concurrency</a></h3>
+        <div class="meta">2025-05-12</div>
+        <p>Context switching overhead, false sharing pitfalls, lock contention analysis, and NUMA considerations. When threading helps performance and when it destroys it.</p>
+    </div>
+
+    <div class="post">
+        <h3><a href="posts/allocators.html">Custom Allocators</a></h3>
+        <div class="meta">2025-07-22</div>
+        <p>Stack, pool, arena, and ring buffer allocators. When malloc() becomes the bottleneck and how specialized allocation patterns achieve 10-100x speedups.</p>
+    </div>
+
+    <div class="post">
+        <h3><a href="posts/profiling-guide.html">Performance Profiling Deep Dive</a></h3>
+        <div class="meta">2025-04-30</div>
+        <p>Hardware performance counters, flame graphs, and bottleneck identification using perf, Intel VTune, and custom instrumentation.</p>
+    </div>
+    <h2>Special Thanks</h2>
+        <ul>
+            <li><a href="https://coffeebeforearch.github.io/">Nick (CoffeeBeforeArch)</a> – Performance engineering, CPU/GPU architectures and programming</li>
+            <li><a href="https://www.agner.org/">Agner Fog</a> – CPU microarchitecture, optimization manuals</li>
+            <li><a href="https://caseymuratori.com/">Casey Muratori</a> – Game dev, low-level graphics, performance-focused programming</li>
+            <li><a href="https://www.rfleury.com/">Ryan Fleury</a> – Low-level performance, debuggers</li>
+            <li><a href="http://www.farbrausch.com/~fg/">Fabian Giesen</a> – Low-level graphics, software rendering, compression</li>
+            <li><a href="https://algorithmica.org/">Sergey Slotin</a> – Algorithms, performance engineering</li>
+            <li><a href="https://www.brendangregg.com/">Brendan Gregg</a> – Performance analysis, flame graphs, kernel & CPU insights</li>
+            <li><a href="https://justine.lol">Justine Tunney</a> – Low-level programming tricks, size optimization</li>
+            <li><a href="https://github.com/rui314/chibicc">Rui Ueyama</a> – Minimal compilers</li>
+            <li><a href="https://isocpp.org/blog/2025/06/cppcon-2024-introduction-to-wait-free-algorithms-in-cpp-programming-daniel/">Daniel Anderson</a> – Concurrency, wait-free algorithms</li>
+            <li><a href="https://preshing.com/">Eric Preshing</a> – Concurrency, memory models</li>
+            <li><a href="https://bellard.org/">Fabrice Bellard</a> – Minimalism, compilers, emulators</li>
+        </ul>
 
     <hr>
 </body>
