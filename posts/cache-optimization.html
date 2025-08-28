@@ -1,0 +1,465 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Cache-Conscious Data Structures</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .benchmark {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cache-Conscious Data Structures</h1>
+    <div class="meta">2025-07-15 • ~8 min read</div>
+    
+    <p>Memory hierarchy runs your performance. Miss L1, wait 4 cycles. Miss L2, wait 12. Miss L3, wait 300. Miss TLB, add another 100. Understanding the full stack—from DRAM timing to virtual memory—separates fast code from slow code.</p>
+
+    <h2>Memory Hierarchy Reality</h2>
+    <pre>L1 Cache:    32KB,     4 cycles,   64-byte lines
+L2 Cache:   256KB,    12 cycles,   64-byte lines  
+L3 Cache:    8MB,     44 cycles,   64-byte lines
+TLB miss:      -,   ~100 cycles,   page walk
+DRAM:       16GB,    200 cycles,   64-byte bursts
+Page size:     -,         4KB,   TLB entry</pre>
+
+    <h2>DRAM Deep Dive</h2>
+    <p>DRAM isn't just slow—it's weird. Understanding bank conflicts and timing constraints matters:</p>
+
+    <pre>// DRAM organization
+Banks: 8-16 per channel (can work in parallel)
+Rows: 32K-128K per bank (RAS - Row Address Strobe) 
+Cols: 1K-8K per row (CAS - Column Address Strobe)
+Burst: 8 transfers per CAS (64 bytes on 64-bit bus)
+
+// Timing constraints (DDR4-3200 example)
+tRCD: 22 cycles  (RAS to CAS delay)
+tRP:  22 cycles  (Row Precharge time) 
+tRAS: 52 cycles  (Row Active Strobe)
+CL:   22 cycles  (CAS Latency)</pre>
+
+    <p>Access pattern matters. Sequential reads within same row: fast. Different rows in same bank: row buffer miss penalty. Different banks: parallel access.</p>
+
+    <h2>Memory Access Patterns</h2>
+    <pre>// Best case - sequential within page/row
+for (int i = 0; i < n; i++) {
+    data[i] = process(data[i]);  // Perfect row buffer hits
+}
+
+// Worst case - random across banks
+for (int i = 0; i < n; i++) {
+    int random_idx = hash(i) % n;
+    data[random_idx] = process(data[random_idx]);  // Bank conflicts
+}
+
+// Strided access - depends on stride
+for (int i = 0; i < n; i += 64) {  // 64-int stride
+    data[i] = process(data[i]);     // Likely different rows
+}</pre>
+
+    <h2>Virtual Memory and TLB</h2>
+    <p>Virtual addresses aren't free. Every memory access needs translation:</p>
+
+    <pre>Virtual Address → Page Table Walk → Physical Address
+                       ↑
+                   TLB Cache (64-1024 entries)
+
+// TLB miss cost
+Page Table Walk: 4 levels × ~100 cycles = 400 cycles
+Plus DRAM access: +200 cycles = 600 total cycles</pre>
+
+    <p>TLB optimization strategies:</p>
+
+    <pre>// Use huge pages to reduce TLB pressure
+mmap(NULL, size, PROT_READ|PROT_WRITE, 
+     MAP_PRIVATE|MAP_ANONYMOUS|MAP_HUGETLB, -1, 0);  // 2MB pages
+
+// Access patterns that maximize TLB hits
+void process_2d_array(int data[1024][1024]) {
+    // Good - row-major, page locality
+    for (int i = 0; i < 1024; i++) {
+        for (int j = 0; j < 1024; j++) {
+            data[i][j] = compute(data[i][j]);
+        }
+    }
+    
+    // Bad - column-major, TLB thrashing  
+    for (int j = 0; j < 1024; j++) {
+        for (int i = 0; i < 1024; i++) {
+            data[i][j] = compute(data[i][j]);  // New page every 1024 ints
+        }
+    }
+}</pre>
+
+    <h2>Memory Bandwidth vs Latency</h2>
+    <p>Modern DRAM: ~50GB/s bandwidth, ~200 cycle latency. Latency kills single-threaded code. Bandwidth kills when you saturate it:</p>
+
+    <pre>// Memory bandwidth test
+void bandwidth_test() {
+    const size_t SIZE = 1GB;
+    char* data = new char[SIZE];
+    
+    // Sequential read - ~45GB/s (near peak)
+    volatile char sum = 0;
+    for (size_t i = 0; i < SIZE; i++) {
+        sum += data[i];
+    }
+    
+    // Random read - ~2GB/s (latency bound)
+    for (size_t i = 0; i < SIZE; i++) {
+        size_t idx = hash(i) % SIZE;
+        sum += data[idx];
+    }
+}</pre>
+
+    <h2>NUMA Awareness</h2>
+    <p>Multi-socket systems have local vs remote memory:</p>
+
+    <pre>// Check NUMA topology
+numactl --hardware
+// Node 0: 0-15   (cores 0-15, local memory)
+// Node 1: 16-31  (cores 16-31, local memory)
+
+// Bad - cross-socket memory access
+void* ptr = numa_alloc_onnode(size, 1);  // Allocate on node 1
+// Run on cores 0-15 → remote access, 2x latency
+
+// Good - local memory access  
+cpu_set_t cpuset;
+CPU_SET(16, &cpuset);  // Pin to node 1
+pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+void* ptr = numa_alloc_local(size);  // Local to current node</pre>
+    <pre>// Array of Structures (AoS) - cache unfriendly
+struct Particle {
+    float x, y, z;     // position  
+    float vx, vy, vz;  // velocity
+    float mass;        // 28 bytes total
+};
+Particle particles[1000];
+
+// Update only positions
+for (int i = 0; i < 1000; i++) {
+    particles[i].x += particles[i].vx * dt;  // loads 64 bytes, uses 8
+    particles[i].y += particles[i].vy * dt;  // another cache miss
+    particles[i].z += particles[i].vz * dt;  // another miss
+}</pre>
+
+    <pre>// Structure of Arrays (SoA) - cache friendly  
+struct ParticleSystem {
+    float x[1000], y[1000], z[1000];        // positions
+    float vx[1000], vy[1000], vz[1000];     // velocities  
+    float mass[1000];                        // masses
+};
+
+// Update positions - sequential access
+for (int i = 0; i < 1000; i++) {
+    x[i] += vx[i] * dt;    // 16 floats per cache line
+    y[i] += vy[i] * dt;    // perfect sequential access
+    z[i] += vz[i] * dt;    // maximum cache utilization
+}</pre>
+
+    <div class="benchmark">
+        <strong>Particle simulation (100k particles)</strong><br>
+        Array of Structures: <strong>45ms</strong><br>
+        Structure of Arrays: <strong>12ms</strong><br>
+        Same computation. 3.7x speedup from cache efficiency.
+    </div>
+
+    <h2>Data Layout and Alignment</h2>
+    <p>Align data to cache line boundaries for optimal access:</p>
+
+    <pre>// Bad alignment - spans cache lines
+struct BadStruct {
+    char padding;      // 1 byte
+    double value;      // 8 bytes, starts at offset 1
+};  // value spans 2 cache lines
+
+// Good alignment  
+struct alignas(64) GoodStruct {
+    double value;      // starts at cache line boundary
+    char padding[56];  // fill rest of cache line
+};
+
+// Pack hot data together
+struct HotData {
+    int frequently_used_a;
+    int frequently_used_b;
+    // cold data at the end
+    char debug_info[1000];
+} __attribute__((packed));</pre>
+
+    <h2>Prefetching Strategies</h2>
+    <p>Tell the CPU what you'll need next:</p>
+
+    <pre>// Manual prefetching
+void process_array(int* data, int n) {
+    const int prefetch_distance = 64;  // tune this
+    
+    for (int i = 0; i < n; i++) {
+        // Prefetch future data
+        if (i + prefetch_distance < n) {
+            __builtin_prefetch(&data[i + prefetch_distance], 0, 3);
+        }
+        
+        // Process current data
+        expensive_computation(data[i]);
+    }
+}
+
+// Software prefetching for linked lists
+struct Node {
+    int data;
+    Node* next;
+};
+
+void traverse_list(Node* head) {
+    Node* current = head;
+    while (current) {
+        // Prefetch next node while processing current
+        if (current->next) {
+            __builtin_prefetch(current->next, 0, 3);
+        }
+        
+        process(current->data);
+        current = current->next;
+    }
+}</pre>
+
+    <h2>Cache-Friendly Trees</h2>
+    <p>Traditional binary trees are cache disasters. Fix them:</p>
+
+    <pre>// Cache-unfriendly binary tree
+struct TreeNode {
+    int key;
+    TreeNode* left;
+    TreeNode* right;
+};  // Random memory locations, poor locality
+
+// B+ Tree - cache optimized
+struct BPlusNode {
+    static const int FANOUT = 15;  // ~64 bytes per node
+    int keys[FANOUT - 1];
+    BPlusNode* children[FANOUT];
+    bool is_leaf;
+};  // Fits in one cache line, fewer levels
+
+// Van Emde Boas layout - implicit tree in array
+class CacheObliviousTree {
+    vector<int> tree;
+    
+    // Recursive layout: root, left subtree, right subtree
+    void build_veb_layout(int node, int level) {
+        if (level == 0) return;
+        
+        int mid = 1 << (level - 1);
+        tree[node] = get_median(mid);
+        
+        build_veb_layout(2 * node, level - 1);      // left
+        build_veb_layout(2 * node + 1, level - 1);  // right
+    }
+};</pre>
+
+    <h2>Loop Tiling and Blocking</h2>
+    <p>Process data in cache-sized chunks:</p>
+
+    <pre>// Matrix multiplication - cache unfriendly
+void matrix_mult_naive(float** A, float** B, float** C, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            for (int k = 0; k < n; k++) {
+                C[i][j] += A[i][k] * B[k][j];  // B[k][j] has poor locality
+            }
+        }
+    }
+}
+
+// Blocked version - work in cache-friendly tiles
+void matrix_mult_blocked(float** A, float** B, float** C, int n) {
+    const int BLOCK_SIZE = 64;  // tune for L1 cache size
+    
+    for (int ii = 0; ii < n; ii += BLOCK_SIZE) {
+        for (int jj = 0; jj < n; jj += BLOCK_SIZE) {
+            for (int kk = 0; kk < n; kk += BLOCK_SIZE) {
+                // Process BLOCK_SIZE x BLOCK_SIZE submatrix
+                for (int i = ii; i < min(ii + BLOCK_SIZE, n); i++) {
+                    for (int j = jj; j < min(jj + BLOCK_SIZE, n); j++) {
+                        for (int k = kk; k < min(kk + BLOCK_SIZE, n); k++) {
+                            C[i][j] += A[i][k] * B[k][j];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}</pre>
+
+    <h2>Hash Tables for Cache Locality</h2>
+    <p>Design hash tables that play nice with cache lines:</p>
+
+    <pre>// Robin Hood hashing - keeps clusters tight
+class RobinHoodHashMap {
+    struct Entry {
+        uint32_t key;
+        uint32_t value;
+        uint16_t distance;  // distance from ideal position
+    };
+    
+    vector<Entry> table;
+    
+    void insert(uint32_t key, uint32_t value) {
+        size_t pos = hash(key) % table.size();
+        uint16_t distance = 0;
+        Entry entry = {key, value, distance};
+        
+        while (table[pos].distance >= distance) {
+            if (table[pos].key == key) {
+                table[pos].value = value;
+                return;
+            }
+            
+            // Robin Hood: steal from the rich
+            if (distance > table[pos].distance) {
+                swap(entry, table[pos]);
+            }
+            
+            pos = (pos + 1) % table.size();
+            distance++;
+        }
+        
+        table[pos] = entry;
+    }
+};</pre>
+
+    <h2>Memory Pool Allocation</h2>
+    <p>Allocate related objects together for better locality:</p>
+
+    <pre>// Custom allocator for cache locality
+template<typename T>
+class PoolAllocator {
+    static const size_t POOL_SIZE = 4096;  // One page
+    static const size_t OBJECTS_PER_POOL = POOL_SIZE / sizeof(T);
+    
+    struct Pool {
+        alignas(64) T objects[OBJECTS_PER_POOL];
+        size_t next_free = 0;
+        Pool* next_pool = nullptr;
+    };
+    
+    Pool* current_pool = nullptr;
+    
+public:
+    T* allocate() {
+        if (!current_pool || current_pool->next_free >= OBJECTS_PER_POOL) {
+            Pool* new_pool = new Pool();
+            new_pool->next_pool = current_pool;
+            current_pool = new_pool;
+        }
+        
+        return &current_pool->objects[current_pool->next_free++];
+    }
+};</pre>
+
+    <h2>False Sharing Prevention</h2>
+    <p>Keep thread-local data in separate cache lines:</p>
+
+    <pre>// Bad - false sharing
+struct ThreadData {
+    int counter_thread_0;  // \
+    int counter_thread_1;  //  > Same cache line = false sharing
+    int counter_thread_2;  // /
+};
+
+// Good - cache line padding
+struct alignas(64) ThreadData {
+    int counter;
+    char padding[60];  // Fill rest of cache line
+};
+
+ThreadData thread_data[NUM_THREADS];  // Each in separate cache line</pre>
+
+    <h2>Measuring Memory Performance</h2>
+    <pre># Complete memory hierarchy analysis
+perf stat -e cache-misses,cache-references,\
+dTLB-load-misses,dTLB-loads,\
+node-loads,node-load-misses ./program
+
+# Memory bandwidth utilization
+perf stat -e uncore_imc/data_reads/,uncore_imc/data_writes/ ./program
+
+# NUMA effects
+numastat -p $(pidof program)
+
+# Intel Memory Latency Checker
+mlc --loaded_latency -d0 -T
+
+# Visual Studio - memory access patterns  
+# Performance Profiler → Memory Usage
+# Look for heap allocation patterns
+
+# Intel VTune - comprehensive memory analysis
+vtune -collect memory-access -knob analyze-mem-objects=true ./program</pre>
+
+    <h2>Data Structure Cheat Sheet</h2>
+    <pre>Array:          Perfect locality, hardware prefetcher friendly
+Linked List:    TLB + cache disaster, use arrays instead  
+Binary Tree:    Random access, poor for all levels
+B-Tree:         Cache-line sized nodes, fewer TLB misses
+Hash Table:     Good with Robin Hood, terrible with chaining
+Queue:          Ring buffer > linked (page locality)
+Stack:          Array-based > linked (TLB efficiency)
+2D Array:       Row-major > column-major (page access)
+
+Memory Access Rules:
+- Sequential > strided > random
+- Same page > different page (TLB)
+- Same row > different row (DRAM)
+- Local NUMA > remote NUMA
+- Aligned > unaligned (cache line)
+- Predictable > unpredictable (prefetcher)</pre>
+
+    <h2>Bottom Line</h2>
+    <p>Memory hierarchy has many layers. L1 miss costs 4x. L2 miss costs 12x. L3 miss costs 50x. TLB miss adds 100x. NUMA miss doubles latency. DRAM bank conflict stalls pipeline. Design for the whole stack, not just cache. Profile everything—from TLB to bandwidth utilization.</p>
+
+    <p><a href="../index.html">← Back</a></p>
+</body>
+</html>
