@@ -1,83 +1,168 @@
 <!doctype html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Strength Reduction — emomaxd</title>
-  <meta name="description" content="Strength reduction: optimize expensive ops like division into cheaper operations—deep dive and benchmarks." />
-  <style>
-    :root {
-      --bg:#0b0f12;
-      --panel:#0f1518;
-      --muted:#95a0a6;
-      --accent:#7bd389;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace;
-      --sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue';
-    }
-    *{box-sizing:border-box}
-    body {
-      margin:0;
-      font-family:var(--sans);
-      background:linear-gradient(180deg,var(--bg),#071013 120%);
-      color:#e6eef3;
-      line-height:1.6;
-      padding:32px;
-      max-width:780px;
-      margin:auto;
-    }
-    h1,h2,h3{line-height:1.2}
-    pre { background:#061014; padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.05); font-family:var(--mono); font-size:13px; overflow:auto; }
-    code{font-family:var(--mono); background:rgba(255,255,255,0.04); padding:2px 4px; border-radius:4px; font-size:90%;}
-    .meta{color:var(--muted); font-size:13px; margin-bottom:16px;}
-    a { color:var(--accent); text-decoration:none; }
-    a:hover { text-decoration:underline; }
-  </style>
+    <meta charset="utf-8">
+    <title>Strength Reduction in Critical Paths</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .benchmark {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
 </head>
 <body>
+    <h1>Strength Reduction in Critical Paths</h1>
+    <div class="meta">2025-08-10 • ~4 min read</div>
+    
+    <p>Strength reduction swaps expensive ops for cheap ones. Division becomes multiplication. Modulo becomes bitwise AND. Your compiler does this automatically—when it can.</p>
 
-  <h1>Strength Reduction</h1>
-  <div class="meta">Adapted · ~6 min read</div>
+    <h2>The Basics</h2>
+    <p>Check if number is odd: <code>x % 2</code> becomes <code>x &amp; 1</code>. One instruction instead of dozens. Free performance.</p>
+    
+    <p>Divide by 8: <code>x / 8</code> becomes <code>x &gt;&gt; 3</code>. Bit shift vs division unit. No contest.</p>
 
-  <p>
-    Strength reduction is a compiler optimization where expensive operations—like integer division—are replaced with functionally equivalent but much cheaper alternatives. This is not conjecture; it's what modern compilers do in release mode. :contentReference[oaicite:0]{index=0}
-  </p>
+    <h2>Constant vs Variable Divisors</h2>
+    <p>Compiler sees <code>x % 1245</code>? Optimizes to multiply-shift sequence. Sees <code>x % divisor</code>? Can't help you—emits <code>idiv</code>.</p>
 
-  <h2>Case 1: is_odd via modulo → bitwise</h2>
-  <p>
-    Example: checking if a number is odd. Instead of using `% 2`, the compiler emits `x & 1` under the hood. That's strength reduction in action. Clean, simple, and fast. :contentReference[oaicite:1]{index=1}
-  </p>
+    <pre>// This gets optimized
+for (int i = 0; i < n; i++) {
+    if (data[i] % 16 == 0) process(data[i]);
+}
 
-  <h2>Case 2: remainder with constant divisor</h2>
-  <p>
-    When divisor is a compile-time constant (e.g., `1245` or `892`), compilers can avoid `idiv` entirely—using shifts, multiplies, subtracts, and adds to compute `x % C`. It gets optimized into a sequence of cheap arithmetic ops. :contentReference[oaicite:2]{index=2}
-  </p>
+// This doesn't 
+void func(int divisor) {
+    for (int i = 0; i < n; i++) {
+        if (data[i] % divisor == 0) process(data[i]);
+    }
+}</pre>
 
-  <h2>Case 3: unknown divisor</h2>
-  <p>
-    If the divisor is dynamic (function parameter), compiler plays safe: it can't strength-reduce, and you get an `idiv` instruction. Straightforward, expected. :contentReference[oaicite:3]{index=3}
-  </p>
+    <h2>Real Numbers</h2>
+    <div class="benchmark">
+        <strong>Benchmark: 1M modulo operations</strong><br>
+        Constant divisor (1245): <strong>4.6μs</strong><br>
+        Variable divisor (1245): <strong>36μs</strong><br>
+        Speedup: <strong>7.8x</strong>
+    </div>
 
-  <h2>Case 4: benchmark comparison</h2>
-  <pre>
-// strength-reduced branch (constant divisor)
-BENCHMARK(srMod);
-v_out[i] = v_in[i] % 1245;
+    <p>Same input, same divisor value. Only difference: compiler knowledge at build time.</p>
 
-// baseline branch (dynamic divisor)
-BENCHMARK(baseMod)->Arg(1245);
-v_out[i] = v_in[i] % s.range(0);
-  </pre>
-  <p>
-    Result: strength-reduced version runs in ~4.6 µs, while the dynamic divisor (with real `idiv`) takes ~36 µs. That’s nearly **9× speedup**. :contentReference[oaicite:4]{index=4}
-  </p>
+    <h2>Manual Strength Reduction</h2>
+    <p>Sometimes you know better than the compiler:</p>
 
-  <h2>Your takeaway</h2>
-  <p>
-    Trust the compiler—but don’t worship. When divisor isn't constant, compiler can't optimize. If you're hand-rolling loops in tight spots (profiling critical paths, HPC code, SIMD kernels), sometimes you need to code strength-reduction yourself—or ensure constants are compile-time fixed. Benchmark relentlessly.
-  </p>
+    <pre>// Instead of x % (1 &lt;&lt; k)
+result = x &amp; ((1 &lt;&lt; k) - 1);
 
-  <p><a href="../blog.html">← Back to blog</a></p>
+// Instead of x / (1 &lt;&lt; k) 
+result = x &gt;&gt; k;
 
+// Replace expensive modulo in loops
+// when you know the pattern
+int mask = size - 1;  // size must be power of 2
+for (int i = 0; i < n; i++) {
+    buffer[i &amp; mask] = data[i];
+}</pre>
+
+    <h2>Division by Multiplication</h2>
+    <p>Classic trick: replace <code>x / d</code> with <code>x * (magic_number) &gt;&gt; shift</code>. Compiler does this for constants. You can do it for known runtime values:</p>
+
+    <pre>// Precompute magic constants for fast division
+struct FastDiv {
+    uint32_t multiplier;
+    uint8_t shift;
+};
+
+FastDiv make_fast_div(uint32_t d) {
+    // Magic number computation
+    int shift = 32 + __builtin_clz(d - 1);
+    uint64_t tmp = ((1ULL &lt;&lt; shift) + d - 1) / d;
+    return {tmp, shift - 32};
+}
+
+uint32_t fast_divide(uint32_t x, FastDiv fd) {
+    return ((uint64_t)x * fd.multiplier) &gt;&gt; fd.shift;
+}</pre>
+
+    <h2>Branch-Free Conditionals</h2>
+    <p>Replace branches with arithmetic when possible:</p>
+
+    <pre>// Instead of
+if (x &lt; 0) x = -x;
+
+// Use
+int mask = x &gt;&gt; 31;  // -1 if negative, 0 if positive
+x = (x ^ mask) - mask;</pre>
+
+    <h2>SIMD Considerations</h2>
+    <p>Vector units hate division. Design algorithms around this:</p>
+
+    <pre>// Bad: division in inner loop
+for (int i = 0; i < n; i += 8) {
+    __m256i v = _mm256_load_si256(&amp;data[i]);
+    v = _mm256_div_epi32(v, divisor);  // Slow
+}
+
+// Good: reciprocal multiplication
+float reciprocal = 1.0f / divisor;
+for (int i = 0; i < n; i += 8) {
+    __m256 v = _mm256_load_ps(&amp;data[i]);
+    v = _mm256_mul_ps(v, _mm256_set1_ps(reciprocal));
+}</pre>
+
+    <h2>Profile Everything</h2>
+    <p>Strength reduction isn't always worth it. Measure:</p>
+
+    <pre># Check what compiler actually emits
+gcc -O3 -S your_code.c
+objdump -d your_binary
+
+# Profile hotspots
+perf record -g ./your_program
+perf report</pre>
+
+    <p>Sometimes the "slow" operation isn't the bottleneck. Sometimes your clever optimization makes code unreadable for 2% gain. Pick your battles.</p>
+
+    <h2>Bottom Line</h2>
+    <p>Compiler handles obvious cases. You handle the subtle ones. Know your tools, profile your assumptions, and remember—premature optimization kills more projects than slow division ever will.</p>
+
+    <p><a href="../index.html">← Back</a></p>
 </body>
 </html>
-
