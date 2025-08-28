@@ -1,0 +1,377 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Auto-Vectorization and SIMD</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .benchmark {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>Auto-Vectorization and SIMD</h1>
+    <div class="meta">2025-05-25 • ~7 min read</div>
+    
+    <p>Modern CPUs can process 8 floats or 16 ints in one instruction. Compiler tries to auto-vectorize your loops. Sometimes it succeeds. Often it doesn't. When it fails, you write SIMD by hand.</p>
+
+    <h2>SIMD Capabilities by Architecture</h2>
+    <pre>x86 SSE:    128-bit, 4 floats, 4 ints, 16 chars
+x86 AVX:    256-bit, 8 floats, 8 ints, 32 chars  
+x86 AVX-512: 512-bit, 16 floats, 16 ints, 64 chars
+ARM NEON:   128-bit, 4 floats, 4 ints, 16 chars
+ARM SVE:    128-2048 bit, scalable vector length
+
+Intel Xeon: AVX-512 with 2 ports, peak 32 ops/cycle
+AMD Ryzen:  AVX2 with 2 ports, peak 16 ops/cycle
+M1/M2:      NEON with 4 ports, peak 16 ops/cycle</pre>
+
+    <h2>When Auto-Vectorization Works</h2>
+    <p>Compiler can vectorize simple, predictable loops:</p>
+
+    <pre>// Perfect - compiler vectorizes to AVX
+void add_arrays(float* a, float* b, float* c, int n) {
+    for (int i = 0; i < n; i++) {
+        c[i] = a[i] + b[i];  // 8 operations per AVX instruction
+    }
+}
+
+// Good - reduction patterns work
+float sum_array(float* data, int n) {
+    float sum = 0.0f;
+    for (int i = 0; i < n; i++) {
+        sum += data[i];      // Vectorized with horizontal add
+    }
+    return sum;
+}
+
+// Check what compiler generated
+// gcc -O3 -march=native -fopt-info-vec source.c</pre>
+
+    <h2>When Auto-Vectorization Fails</h2>
+    <p>Compiler gives up on complex patterns:</p>
+
+    <pre>// Loop-carried dependency - can't vectorize
+void running_sum(float* data, int n) {
+    for (int i = 1; i < n; i++) {
+        data[i] += data[i-1];  // Each iteration depends on previous
+    }
+}
+
+// Conditional execution - compiler conservative
+void conditional_add(float* a, float* b, float* c, int n) {
+    for (int i = 0; i < n; i++) {
+        if (a[i] > 0.0f) {     // Branches kill vectorization
+            c[i] = a[i] + b[i];
+        } else {
+            c[i] = a[i] - b[i];
+        }
+    }
+}
+
+// Complex addressing - compiler can't prove safety
+void indirect_access(float* data, int* indices, int n) {
+    for (int i = 0; i < n; i++) {
+        data[indices[i]] += 1.0f;  // Potential aliasing issues
+    }
+}</pre>
+
+    <h2>Helping the Compiler</h2>
+    <p>Give vectorizer hints and remove obstacles:</p>
+
+    <pre>// Alignment hints
+void process_aligned(float* __restrict__ a, float* __restrict__ b, int n) {
+    // Tell compiler pointers don't alias
+    a = __builtin_assume_aligned(a, 32);  // AVX alignment
+    b = __builtin_assume_aligned(b, 32);
+    
+    #pragma GCC ivdep  // Ignore vector dependencies
+    for (int i = 0; i < n; i++) {
+        a[i] = a[i] + b[i];
+    }
+}
+
+// Loop unroll hints
+#pragma GCC unroll 8
+for (int i = 0; i < n; i++) {
+    data[i] = compute(data[i]);
+}
+
+// OpenMP SIMD directive
+#pragma omp simd aligned(a,b:32) safelen(8)
+for (int i = 0; i < n; i++) {
+    a[i] = sqrt(b[i]);
+}</pre>
+
+    <h2>Manual Intrinsics</h2>
+    <p>When compiler fails, write SIMD directly:</p>
+
+    <pre>// AVX2 manual vectorization
+void add_arrays_avx2(float* a, float* b, float* c, int n) {
+    int simd_end = n - (n % 8);  // Process 8 at a time
+    
+    for (int i = 0; i < simd_end; i += 8) {
+        __m256 va = _mm256_load_ps(&a[i]);
+        __m256 vb = _mm256_load_ps(&b[i]);
+        __m256 vc = _mm256_add_ps(va, vb);
+        _mm256_store_ps(&c[i], vc);
+    }
+    
+    // Handle remainder scalar
+    for (int i = simd_end; i < n; i++) {
+        c[i] = a[i] + b[i];
+    }
+}
+
+// Complex operations - FMA (fused multiply-add)
+void fma_loop(float* a, float* b, float* c, float* d, int n) {
+    for (int i = 0; i < n; i += 8) {
+        __m256 va = _mm256_load_ps(&a[i]);
+        __m256 vb = _mm256_load_ps(&b[i]);
+        __m256 vc = _mm256_load_ps(&c[i]);
+        __m256 result = _mm256_fmadd_ps(va, vb, vc);  // a*b + c
+        _mm256_store_ps(&d[i], result);
+    }
+}</pre>
+
+    <h2>Conditional SIMD</h2>
+    <p>Handle branches with masking instead of actual branches:</p>
+
+    <pre>// Replace branch with blend
+void conditional_simd(float* a, float* b, float* c, int n) {
+    for (int i = 0; i < n; i += 8) {
+        __m256 va = _mm256_load_ps(&a[i]);
+        __m256 vb = _mm256_load_ps(&b[i]);
+        
+        // Create mask: va > 0
+        __m256 zero = _mm256_setzero_ps();
+        __m256 mask = _mm256_cmp_ps(va, zero, _CMP_GT_OQ);
+        
+        // Compute both paths
+        __m256 add_result = _mm256_add_ps(va, vb);
+        __m256 sub_result = _mm256_sub_ps(va, vb);
+        
+        // Blend based on mask
+        __m256 result = _mm256_blendv_ps(sub_result, add_result, mask);
+        _mm256_store_ps(&c[i], result);
+    }
+}</pre>
+
+    <h2>Memory Access Patterns</h2>
+    <p>SIMD performance depends heavily on memory layout:</p>
+
+    <pre>// Bad - non-contiguous access
+struct Point { float x, y, z; };
+Point* points = new Point[n];
+for (int i = 0; i < n; i++) {
+    points[i].x *= 2.0f;  // Strided access, wasted bandwidth
+}
+
+// Good - structure of arrays
+float* x_coords = new float[n];
+float* y_coords = new float[n];
+float* z_coords = new float[n];
+
+// Perfect vectorization
+for (int i = 0; i < n; i += 8) {
+    __m256 vx = _mm256_load_ps(&x_coords[i]);
+    __m256 scaled = _mm256_mul_ps(vx, _mm256_set1_ps(2.0f));
+    _mm256_store_ps(&x_coords[i], scaled);
+}</pre>
+
+    <h2>Cross-Platform SIMD</h2>
+    <p>Write once, run everywhere with abstraction layers:</p>
+
+    <pre>// SIMDe - SIMD everywhere
+#include <simde/x86/avx2.h>
+
+void portable_add(float* a, float* b, float* c, int n) {
+    for (int i = 0; i < n; i += 8) {
+        simde__m256 va = simde_mm256_load_ps(&a[i]);
+        simde__m256 vb = simde_mm256_load_ps(&b[i]);
+        simde__m256 vc = simde_mm256_add_ps(va, vb);
+        simde_mm256_store_ps(&c[i], vc);
+    }
+}
+// Compiles to AVX on x86, NEON on ARM
+
+// Highway - Google's portable SIMD
+#include "hwy/highway.h"
+namespace hn = hwy::HWY_NAMESPACE;
+
+void highway_add(float* a, float* b, float* c, int n) {
+    const hn::ScalableTag<float> d;
+    const size_t N = Lanes(d);
+    
+    for (int i = 0; i < n; i += N) {
+        auto va = Load(d, &a[i]);
+        auto vb = Load(d, &b[i]);  
+        Store(Add(va, vb), d, &c[i]);
+    }
+}</pre>
+
+    <h2>Integer SIMD Optimizations</h2>
+    <p>Integer operations have different characteristics:</p>
+
+    <pre>// Pack/unpack for different data types
+void convert_u8_to_float(uint8_t* input, float* output, int n) {
+    for (int i = 0; i < n; i += 16) {
+        // Load 16 bytes
+        __m128i bytes = _mm_load_si128((__m128i*)&input[i]);
+        
+        // Unpack to 16-bit
+        __m128i low = _mm_unpacklo_epi8(bytes, _mm_setzero_si128());
+        __m128i high = _mm_unpackhi_epi8(bytes, _mm_setzero_si128());
+        
+        // Convert to float (8 at a time)
+        __m256i words = _mm256_set_m128i(high, low);
+        __m256 floats = _mm256_cvtepi32_ps(_mm256_unpacklo_epi16(words, _mm256_setzero_si256()));
+        
+        _mm256_store_ps(&output[i], floats);
+    }
+}
+
+// Saturated arithmetic for image processing
+void brighten_image_simd(uint8_t* pixels, int n, int brightness) {
+    __m128i bright = _mm_set1_epi8(brightness);
+    
+    for (int i = 0; i < n; i += 16) {
+        __m128i data = _mm_load_si128((__m128i*)&pixels[i]);
+        __m128i result = _mm_adds_epu8(data, bright);  // Saturated add
+        _mm_store_si128((__m128i*)&pixels[i], result);
+    }
+}</pre>
+
+    <h2>Vectorization for Specific Algorithms</h2>
+    <p>Common patterns that benefit from SIMD:</p>
+
+    <pre>// Dot product with horizontal reduction
+float dot_product_avx(float* a, float* b, int n) {
+    __m256 sum = _mm256_setzero_ps();
+    
+    for (int i = 0; i < n; i += 8) {
+        __m256 va = _mm256_load_ps(&a[i]);
+        __m256 vb = _mm256_load_ps(&b[i]);
+        sum = _mm256_fmadd_ps(va, vb, sum);
+    }
+    
+    // Horizontal sum
+    __m128 hi = _mm256_extractf128_ps(sum, 1);
+    __m128 lo = _mm256_castps256_ps128(sum);
+    __m128 sum128 = _mm_add_ps(hi, lo);
+    
+    sum128 = _mm_hadd_ps(sum128, sum128);
+    sum128 = _mm_hadd_ps(sum128, sum128);
+    
+    return _mm_cvtss_f32(sum128);
+}
+
+// String operations
+int strlen_simd(const char* str) {
+    const __m256i zero = _mm256_setzero_si256();
+    const char* ptr = str;
+    
+    while (true) {
+        __m256i chunk = _mm256_load_si256((__m256i*)ptr);
+        __m256i cmp = _mm256_cmpeq_epi8(chunk, zero);
+        int mask = _mm256_movemask_epi8(cmp);
+        
+        if (mask) {
+            return ptr - str + __builtin_ctz(mask);
+        }
+        ptr += 32;
+    }
+}</pre>
+
+    <div class="benchmark">
+        <strong>Array addition (1M floats)</strong><br>
+        Scalar loop: <strong>8.2ms</strong><br>
+        Auto-vectorized: <strong>1.1ms</strong><br>
+        Manual AVX2: <strong>0.9ms</strong><br>
+        Manual AVX-512: <strong>0.5ms</strong>
+    </div>
+
+    <h2>Profiling SIMD Code</h2>
+    <pre># Check vectorization reports
+gcc -O3 -march=native -fopt-info-vec-all source.c
+
+# Intel compiler vectorization
+icc -qopt-report=5 -qopt-report-phase=vec source.c
+
+# Examine generated assembly
+objdump -d -M intel binary | grep -A20 "vmovaps\|vmulps\|vaddps"
+
+# Performance analysis
+perf stat -e fp_arith_inst_retired.scalar_single,\
+fp_arith_inst_retired.256b_packed_single ./program
+
+# Intel VTune - SIMD efficiency
+vtune -collect microarchitecture ./program</pre>
+
+    <h2>Common SIMD Pitfalls</h2>
+    <p>Avoid these performance traps:</p>
+
+    <pre>// Don't mix scalar and vector in tight loops
+for (int i = 0; i < n; i += 8) {
+    __m256 v = _mm256_load_ps(&data[i]);
+    float scalar = data[i+8];  // Breaks SIMD pipeline
+    // Process...
+}
+
+// Alignment matters - use aligned loads when possible
+float* aligned_data = (float*)_mm_malloc(n * sizeof(float), 32);
+
+// Don't ignore remainder handling
+int simd_end = (n / 8) * 8;  // Not n - (n % 8)
+
+// Cache line splits kill performance
+struct alignas(32) Vector8 {
+    float data[8];  // Ensure no cache line crossing
+};</pre>
+
+    <h2>Bottom Line</h2>
+    <p>Auto-vectorization works for simple loops. Complex patterns need manual SIMD. Memory layout dominates performance—get SoA right first. Cross-platform SIMD libraries save time. Profile vector instruction retirement rates, not just cycle counts. 8x theoretical speedup becomes 4x real speedup with good code.</p>
+
+    <p><a href="../index.html">← Back</a></p>
+</body>
+</html>
