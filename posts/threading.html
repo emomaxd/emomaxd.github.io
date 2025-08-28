@@ -1,0 +1,604 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Threading, Parallelism and Concurrency</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .benchmark {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>Threading, Parallelism and Concurrency</h1>
+    <div class="meta">2025-05-12 • ~9 min read</div>
+    
+    <p>Threading is not free. Context switches cost cycles. False sharing kills performance. Too many threads create more overhead than parallelism. Understanding when and how to parallelize separates fast code from slow code.</p>
+
+    <h2>Threading Overhead Reality</h2>
+    <p>Every thread has costs—memory, context switching, synchronization:</p>
+
+    <pre>// Thread creation overhead
+Thread stack: ~1MB default (Linux/Windows)
+Thread control block: ~8KB kernel structures  
+Context switch: 1000-10000 cycles typical
+
+// Small task parallelization - usually wrong
+void bad_parallel_sum(std::vector<int>& data) {
+    const int num_threads = std::thread::hardware_concurrency();
+    const int chunk_size = data.size() / num_threads;
+    
+    std::vector<std::thread> threads;
+    std::vector<int> partial_sums(num_threads);
+    
+    for (int i = 0; i < num_threads; i++) {
+        threads.emplace_back([&, i]() {
+            int sum = 0;
+            int start = i * chunk_size;
+            int end = (i == num_threads - 1) ? data.size() : start + chunk_size;
+            for (int j = start; j < end; j++) {
+                sum += data[j];  // Simple operation - overhead exceeds benefit
+            }
+            partial_sums[i] = sum;
+        });
+    }
+    
+    for (auto& t : threads) t.join();  // Context switch overhead
+}
+
+// Rule of thumb: Task should take >10,000 cycles to benefit from threading</pre>
+
+    <h2>Context Switching Costs</h2>
+    <p>Frequent context switches can make parallel code slower than serial:</p>
+
+    <pre>// Context switch overhead
+Direct costs:
+- Save/restore registers: ~100 cycles
+- TLB flush: ~1000 cycles  
+- Pipeline flush: ~500 cycles
+- Cache pollution: Varies greatly
+
+Indirect costs:
+- Cache misses after switch: 10,000+ cycles
+- Branch predictor state lost: 1000+ cycles
+- Prefetcher state lost: Variable
+
+// Pathological case: too many threads
+void context_switch_thrashing() {
+    const int too_many_threads = 100;  // On 8-core machine
+    std::vector<std::thread> threads;
+    
+    for (int i = 0; i < too_many_threads; i++) {
+        threads.emplace_back([i]() {
+            // Short-lived computation
+            volatile int sum = 0;
+            for (int j = 0; j < 1000; j++) {
+                sum += j * i;
+            }
+        });
+    }
+    
+    // Result: OS scheduler thrashes switching between 100 threads
+    // Serial version would be faster
+}</pre>
+
+    <h2>Thread Pool Patterns</h2>
+    <p>Reuse threads to amortize creation costs:</p>
+
+    <pre>class ThreadPool {
+    std::vector<std::thread> workers;
+    std::queue<std::function<void()>> tasks;
+    std::mutex queue_mutex;
+    std::condition_variable condition;
+    bool stop = false;
+
+public:
+    ThreadPool(size_t threads = std::thread::hardware_concurrency()) {
+        for (size_t i = 0; i < threads; ++i) {
+            workers.emplace_back([this] {
+                while (true) {
+                    std::function<void()> task;
+                    {
+                        std::unique_lock<std::mutex> lock(queue_mutex);
+                        condition.wait(lock, [this] { return stop || !tasks.empty(); });
+                        
+                        if (stop && tasks.empty()) return;
+                        
+                        task = std::move(tasks.front());
+                        tasks.pop();
+                    }
+                    task();  // Execute without holding lock
+                }
+            });
+        }
+    }
+    
+    template<class F>
+    void enqueue(F&& f) {
+        {
+            std::unique_lock<std::mutex> lock(queue_mutex);
+            tasks.emplace(std::forward<F>(f));
+        }
+        condition.notify_one();
+    }
+};
+
+// Usage - no thread creation overhead per task
+ThreadPool pool(8);
+for (int i = 0; i < 1000; i++) {
+    pool.enqueue([i] { process_chunk(i); });
+}</pre>
+
+    <h2>False Sharing</h2>
+    <p>Threads accessing different variables in same cache line cause performance disaster:</p>
+
+    <pre>// False sharing example
+struct BadCounters {
+    volatile int counter0;  // Same cache line (64 bytes)
+    volatile int counter1;  // Threads ping-pong cache line
+    volatile int counter2;
+    volatile int counter3;
+};
+
+void false_sharing_demo() {
+    BadCounters counters = {0, 0, 0, 0};
+    
+    std::thread t0([&] { for (int i = 0; i < 1000000; i++) counters.counter0++; });
+    std::thread t1([&] { for (int i = 0; i < 1000000; i++) counters.counter1++; });
+    
+    // Cache line bounces between cores on every increment
+    // Performance worse than single threaded
+}
+
+// Solution: cache line padding
+struct alignas(64) GoodCounters {  // Force 64-byte alignment
+    volatile int counter;
+    char padding[60];              // Fill rest of cache line
+};
+
+void no_false_sharing() {
+    GoodCounters counters[4];      // Each counter in separate cache line
+    
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 4; i++) {
+        threads.emplace_back([&, i] {
+            for (int j = 0; j < 1000000; j++) {
+                counters[i].counter++;  // No cache line contention
+            }
+        });
+    }
+}</pre>
+
+    <h2>Lock Overhead and Contention</h2>
+    <p>Locks have significant costs even when uncontended:</p>
+
+    <pre>// Lock overhead (typical x86-64)
+Uncontended mutex lock/unlock: ~25 cycles
+Contended mutex (no waiting): ~1000 cycles  
+Contended mutex (with waiting): ~10,000+ cycles
+
+// High contention example
+std::mutex global_mutex;
+int shared_counter = 0;
+
+void high_contention() {
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 8; i++) {
+        threads.emplace_back([&] {
+            for (int j = 0; j < 1000000; j++) {
+                std::lock_guard<std::mutex> lock(global_mutex);
+                shared_counter++;  // Tiny critical section, huge contention
+            }
+        });
+    }
+    // All threads serialize on single mutex - no parallelism
+}
+
+// Better: per-thread counters + final reduction
+void reduced_contention() {
+    const int num_threads = 8;
+    std::vector<int> thread_counters(num_threads, 0);
+    std::vector<std::thread> threads;
+    
+    for (int i = 0; i < num_threads; i++) {
+        threads.emplace_back([&, i] {
+            for (int j = 0; j < 1000000; j++) {
+                thread_counters[i]++;  // No synchronization needed
+            }
+        });
+    }
+    
+    for (auto& t : threads) t.join();
+    
+    int total = 0;
+    for (int count : thread_counters) total += count;  // Single-threaded reduction
+}</pre>
+
+    <h2>Work-Stealing and Load Balancing</h2>
+    <p>Uneven work distribution kills parallel efficiency:</p>
+
+    <pre>// Bad: uneven work distribution
+void uneven_workload() {
+    std::vector<int> work_sizes = {1000, 5000, 100, 8000, 200};  // Highly variable
+    std::vector<std::thread> threads;
+    
+    for (int i = 0; i < work_sizes.size(); i++) {
+        threads.emplace_back([&, i] {
+            for (int j = 0; j < work_sizes[i]; j++) {
+                expensive_computation();
+            }
+        });
+    }
+    // Thread with 8000 units becomes bottleneck - others wait idle
+}
+
+// Better: work-stealing queue
+class WorkStealingQueue {
+    std::deque<std::function<void()>> queue;
+    mutable std::mutex mutex;
+    
+public:
+    void push(std::function<void()> task) {
+        std::lock_guard<std::mutex> lock(mutex);
+        queue.push_back(std::move(task));
+    }
+    
+    bool try_pop(std::function<void()>& task) {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (queue.empty()) return false;
+        task = std::move(queue.front());
+        queue.pop_front();
+        return true;
+    }
+    
+    bool try_steal(std::function<void()>& task) {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (queue.empty()) return false;
+        task = std::move(queue.back());  // Steal from back
+        queue.pop_back();
+        return true;
+    }
+};
+
+// Work-stealing scheduler
+void work_stealing_example() {
+    const int num_threads = std::thread::hardware_concurrency();
+    std::vector<WorkStealingQueue> queues(num_threads);
+    std::vector<std::thread> threads;
+    
+    // Populate work queues
+    for (int i = 0; i < 10000; i++) {
+        queues[i % num_threads].push([i] { process_work_item(i); });
+    }
+    
+    // Worker threads with stealing
+    for (int thread_id = 0; thread_id < num_threads; thread_id++) {
+        threads.emplace_back([&, thread_id] {
+            std::function<void()> task;
+            while (true) {
+                // Try own queue first
+                if (queues[thread_id].try_pop(task)) {
+                    task();
+                    continue;
+                }
+                
+                // Try stealing from others
+                bool found = false;
+                for (int i = 0; i < num_threads; i++) {
+                    if (i != thread_id && queues[i].try_steal(task)) {
+                        task();
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (!found) break;  // No more work
+            }
+        });
+    }
+}</pre>
+
+    <h2>Lock-Free Data Structures</h2>
+    <p>Avoid locks entirely with compare-and-swap primitives:</p>
+
+    <pre>// Lock-free stack using CAS
+template<typename T>
+class LockFreeStack {
+    struct Node {
+        T data;
+        Node* next;
+    };
+    
+    std::atomic<Node*> head{nullptr};
+    
+public:
+    void push(const T& data) {
+        Node* new_node = new Node{data, nullptr};
+        new_node->next = head.load();
+        
+        while (!head.compare_exchange_weak(new_node->next, new_node)) {
+            // CAS failed, retry with updated head value
+            // new_node->next already updated by compare_exchange_weak
+        }
+    }
+    
+    bool pop(T& result) {
+        Node* old_head = head.load();
+        while (old_head && !head.compare_exchange_weak(old_head, old_head->next)) {
+            // CAS failed, retry with updated head value
+        }
+        
+        if (old_head) {
+            result = old_head->data;
+            delete old_head;  // Memory management issue - see ABA problem
+            return true;
+        }
+        return false;
+    }
+};
+
+// ABA Problem solution: hazard pointers or epochs
+template<typename T>
+class SafeLockFreeStack {
+    // Implementation requires complex memory management
+    // Usually better to use proven libraries like libcds
+};</pre>
+
+    <h2>Wait-Free vs Lock-Free</h2>
+    <p>Different progress guarantees for different use cases:</p>
+
+    <pre>// Progress guarantees (strongest to weakest)
+Wait-free:    Every thread makes progress in finite steps
+Lock-free:    At least one thread makes progress  
+Obstruction-free: Thread makes progress if runs alone
+Blocking:     Threads can block indefinitely
+
+// Wait-free counter (simple case)
+class WaitFreeCounter {
+    std::atomic<int> count{0};
+public:
+    int increment() {
+        return count.fetch_add(1, std::memory_order_relaxed);  // Always completes
+    }
+    
+    int get() const {
+        return count.load(std::memory_order_relaxed);  // Always completes
+    }
+};
+
+// Lock-free queue (Michael & Scott algorithm)
+template<typename T>
+class LockFreeQueue {
+    struct Node {
+        std::atomic<T*> data{nullptr};
+        std::atomic<Node*> next{nullptr};
+    };
+    
+    std::atomic<Node*> head;
+    std::atomic<Node*> tail;
+    
+public:
+    LockFreeQueue() {
+        Node* dummy = new Node;
+        head.store(dummy);
+        tail.store(dummy);
+    }
+    
+    void enqueue(T item) {
+        Node* new_node = new Node;
+        T* data = new T(std::move(item));
+        new_node->data.store(data);
+        
+        while (true) {
+            Node* last = tail.load();
+            Node* next = last->next.load();
+            
+            if (last == tail.load()) {  // Consistency check
+                if (next == nullptr) {
+                    if (last->next.compare_exchange_weak(next, new_node)) {
+                        tail.compare_exchange_weak(last, new_node);  // Help advance tail
+                        break;
+                    }
+                } else {
+                    tail.compare_exchange_weak(last, next);  // Help advance tail
+                }
+            }
+        }
+    }
+    
+    // Progress guarantee: at least one thread always makes progress
+    // But individual threads may retry indefinitely under high contention
+};</pre>
+
+    <h2>Memory Ordering in Concurrent Code</h2>
+    <p>Choose appropriate memory ordering for performance:</p>
+
+    <pre>// Relaxed ordering for counters
+std::atomic<int> stats_counter{0};
+void increment_stats() {
+    stats_counter.fetch_add(1, std::memory_order_relaxed);  // Fastest
+}
+
+// Acquire-release for producer-consumer
+std::atomic<bool> ready{false};
+int payload = 0;
+
+void producer() {
+    payload = 42;                                    // Regular store
+    ready.store(true, std::memory_order_release);    // Release barrier
+}
+
+void consumer() {
+    while (!ready.load(std::memory_order_acquire));  // Acquire barrier
+    assert(payload == 42);                           // Guaranteed visible
+}
+
+// Sequential consistency for complex synchronization
+std::atomic<int> x{0}, y{0};
+int r1, r2;
+
+void thread1() { x = 1; r1 = y; }  // Default: memory_order_seq_cst
+void thread2() { y = 1; r2 = x; }
+
+// Guarantee: !(r1 == 0 && r2 == 0) with sequential consistency</pre>
+
+    <h2>NUMA Awareness</h2>
+    <p>Thread and memory placement affects performance on multi-socket systems:</p>
+
+    <pre>// NUMA topology example
+Node 0: CPU 0-7,   Memory Bank 0  (local access: 70ns)
+Node 1: CPU 8-15,  Memory Bank 1  (remote access: 140ns)
+
+// Bad: cross-NUMA memory access
+void numa_unfriendly() {
+    // Allocate on node 0
+    int* data = (int*)numa_alloc_onnode(SIZE * sizeof(int), 0);
+    
+    std::thread worker([&]() {
+        // Thread runs on node 1 - all memory accesses are remote
+        for (int i = 0; i < SIZE; i++) {
+            data[i] = process(data[i]);  // 2x memory latency
+        }
+    });
+    
+    // Pin thread to node 1 CPUs
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    for (int i = 8; i < 16; i++) CPU_SET(i, &cpuset);
+    pthread_setaffinity_np(worker.native_handle(), sizeof(cpuset), &cpuset);
+}
+
+// Good: co-locate thread and memory
+void numa_friendly() {
+    std::thread worker([&]() {
+        // Allocate on local NUMA node
+        int* data = (int*)numa_alloc_local(SIZE * sizeof(int));
+        
+        for (int i = 0; i < SIZE; i++) {
+            data[i] = process(data[i]);  // Local access - 70ns
+        }
+    });
+    
+    // Let OS scheduler place thread optimally
+}</pre>
+
+    <h2>Thread Affinity and CPU Topology</h2>
+    <p>Pin threads to specific cores for consistent performance:</p>
+
+    <pre>// CPU topology awareness
+void set_thread_affinity(std::thread& t, int core_id) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+    
+    int result = pthread_setaffinity_np(t.native_handle(), 
+                                       sizeof(cpu_set_t), &cpuset);
+    if (result != 0) {
+        throw std::runtime_error("Failed to set thread affinity");
+    }
+}
+
+// Avoid hyperthreading interference for CPU-bound tasks  
+void pin_to_physical_cores() {
+    const int num_physical_cores = std::thread::hardware_concurrency() / 2;
+    std::vector<std::thread> threads;
+    
+    for (int i = 0; i < num_physical_cores; i++) {
+        threads.emplace_back([i] {
+            cpu_intensive_work();
+        });
+        
+        // Pin to physical core (skip hyperthreads)
+        set_thread_affinity(threads.back(), i * 2);
+    }
+}</pre>
+
+    <div class="benchmark">
+        <strong>Parallel summation (1M integers)</strong><br>
+        Single threaded: <strong>2.1ms</strong><br>
+        Bad parallelization (100 threads): <strong>15.3ms</strong> (context switching overhead)<br>
+        Thread pool (8 threads): <strong>0.3ms</strong> (7x speedup)<br>
+        Lock-free atomic: <strong>8.9ms</strong> (atomic contention)<br>
+        Per-thread + reduce: <strong>0.28ms</strong> (7.5x speedup)
+    </div>
+
+    <h2>When NOT to Use Threading</h2>
+    <p>Threading isn't always the answer:</p>
+
+    <pre>// Cases where threading hurts:
+// 1. Task granularity too small
+for (int i = 0; i < 1000; i++) {
+    simple_operation(data[i]);  // 10 cycles each - threading overhead dominates
+}
+
+// 2. Memory-bound workloads
+void memory_bound() {
+    // Bottleneck is memory bandwidth, not CPU
+    // More threads just increase cache pressure
+    for (int i = 0; i < huge_array.size(); i++) {
+        result[i] = huge_array[i] * 2;  // Limited by memory, not computation
+    }
+}
+
+// 3. Heavy synchronization requirements
+std::mutex critical_mutex;
+void mostly_synchronized() {
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 8; i++) {
+        threads.emplace_back([&] {
+            for (int j = 0; j < 1000; j++) {
+                std::lock_guard<std::mutex> lock(critical_mutex);
+                // 99% of time spent in critical section
+                lots_of_shared_work();
+            }
+        });
+    }
+    // All threads serialize - no parallelism benefit
+}</pre>
+
+    <h2>Bottom Line</h2>
+    <p>Threading overhead is real. Context switches cost thousands of cycles. False sharing destroys cache performance. Lock contention serializes parallel code. Measure first—many workloads don't benefit from threading. When parallelizing: use thread pools, avoid false sharing, minimize lock contention, consider NUMA placement. Lock-free helps with contention but adds complexity. Profile with thread-aware tools, not just wall-clock time.</p>
+
+    <p><a href="../index.html">← Back</a></p>
+</body>
+</html>
