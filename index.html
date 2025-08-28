@@ -1,316 +1,146 @@
 <!doctype html>
-<html lang="tr">
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="dark light" />
-  <title>Emre Cecanpunar — CV</title>
-  <style>
-    /* ===== Theme ===== */
-    :root{
-      --bg:#0b0f12; 
-      --panel:#0f1518; 
-      --muted:#95a0a6; 
-      --accent:#7bd389;
-      --text:#e6eef3;
-      --ring: rgba(123, 211, 137, 0.6);
-      --border: rgba(255,255,255,0.06);
-      --border-soft: rgba(255,255,255,0.04);
-      --shadow: 0 20px 40px rgba(0,0,0,0.35);
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;
-      --sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto;
-    }
-
-    @media (prefers-color-scheme: light) {
-      :root{
-        --bg:#f7f9fb; --panel:#ffffff; --text:#0b0f12; --muted:#5a6870; 
-        --border: rgba(0,0,0,0.08); --border-soft: rgba(0,0,0,0.05);
-        --shadow: 0 14px 32px rgba(0,0,0,0.12);
-      }
-    }
-
-    /* ===== Base ===== */
-    html, body { height: 100%; }
-    body {
-      margin:0;
-      font-family:var(--sans);
-      background:linear-gradient(180deg,var(--bg),#071013 120%);
-      color:var(--text);
-      padding: clamp(16px, 2vw, 32px);
-      line-height:1.55;
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
-    }
-    a { color:var(--accent); text-decoration:none; }
-    a:hover { text-decoration:underline; }
-    a:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
-
-    .sheet {
-      max-width: 980px;
-      margin:auto;
-      background:var(--panel);
-      border-radius:16px;
-      border:1px solid var(--border-soft);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-
-    /* ===== Header ===== */
-    .header {
-      display:flex;
-      gap:20px;
-      align-items:center;
-      padding:28px clamp(18px, 3vw, 32px);
-    }
-    .logo {
-      width:72px;height:72px;
-      border-radius:14px;
-      display:grid;place-items:center;
-      background:linear-gradient(135deg,#071217 0%, rgba(255,255,255,0.05) 100%);
-      border:1px solid var(--border);
-      font-family:var(--mono);
-      font-weight:800;
-      color:var(--accent);
-      font-size:20px
-    }
-    h1{margin:0;font-size: clamp(20px, 2.4vw, 28px)}
-    .title{color:var(--muted);font-size:13.5px;margin-top:6px}
-
-    .contact {
-      margin-top:10px;
-      display:flex;flex-wrap:wrap;gap:8px;
-    }
-    .chip {
-      display:inline-flex;align-items:center;gap:8px;
-      padding:8px 10px;border-radius:999px;
-      background: rgba(255,255,255,0.04);
-      border:1px solid var(--border-soft);
-      font-size:12.5px;color:var(--muted);
-    }
-    .chip a { text-decoration:none; }
-
-    /* ===== Layout ===== */
-    .content {
-      display:grid;
-      grid-template-columns: 300px 1fr;
-      grid-template-areas: "aside main";
-      gap:20px;
-      padding: 18px clamp(18px, 3vw, 24px) 28px;
-      border-top:1px solid var(--border-soft)
-    }
-    aside { grid-area: aside; }
-    main  { grid-area: main; }
-
-    .card {
-      background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.00));
-      border-radius:12px;
-      padding:14px;
-      border:1px solid var(--border);
-      margin-bottom:12px
-    }
-    .label {
-      font-size:11px;
-      color:var(--muted);
-      text-transform:uppercase;
-      letter-spacing:1px;
-      margin-bottom:8px
-    }
-    .muted{color:var(--muted)}
-
-    h2 {
-      font-size:15px;
-      margin:0 0 10px 0;
-      border-bottom:1px solid var(--border);
-      padding-bottom:6px;
-    }
-    h3 { margin:0;font-size:15px;font-weight:650; }
-
-    .bullet { margin:8px 0 0 0; padding-left:18px }
-    .bullet li { margin:5px 0 }
-
-    /* ===== Experience Cards ===== */
-    .exp-card {
-      background:rgba(255,255,255,0.03);
-      border-radius:10px;
-      padding:12px;
-      margin-bottom:12px;
-      border:1px solid var(--border);
-    }
-    .exp-header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:6px; }
-    .exp-role { font-weight:700; }
-    .exp-company { font-size:13px; color:var(--muted); }
-    .exp-date { font-size:12px; color:var(--muted); white-space:nowrap; }
-
-    /* ===== Utilities ===== */
-    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
-
-    /* ===== Responsive ===== */
-    @media (max-width: 980px) {
-      .content { grid-template-columns: 1fr; grid-template-areas: "main" "aside"; }
-      aside { order: 2; }
-      main  { order: 1; }
-      .header { flex-wrap: wrap; align-items:flex-start; }
-      .logo { width:64px; height:64px; border-radius:12px; }
-    }
-
-    @media (max-width: 560px) {
-      body { padding: 12px; }
-      .sheet { border-radius:12px; }
-      .header { padding:20px; gap:14px; }
-      .content { padding:14px 14px 20px; gap:14px; }
-      h1 { font-size:20px; }
-      .title { font-size:12.5px; }
-      .chip { padding:7px 9px; font-size:12px; }
-      .exp-header { flex-direction: column; align-items:flex-start; }
-      .exp-date { margin-top:4px; }
-    }
-
-    /* ===== Motion preferences ===== */
-    @media (prefers-reduced-motion: reduce) {
-      * { animation: none !important; transition: none !important; }
-    }
-
-    /* ===== Print (A4-friendly) ===== */
-    @media print {
-      body { background: #fff; padding: 0; }
-      .sheet { box-shadow:none; border:none; border-radius:0; }
-      a { color: inherit; text-decoration: none; }
-      .chip { border:none; background: none; padding:0; }
-    }
-  </style>
+    <meta charset="utf-8">
+    <title>Emre Cecanpunar</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+        }
+        .post {
+            margin-bottom: 15px;
+        }
+        .post h3 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: normal;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 30px 0;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 5px;
+        }
+        .contact {
+            margin-left: 0px;
+        }
+    </style>
 </head>
 <body>
-<div class="sheet" role="document" aria-label="Emre Cecanpunar CV">
-  <header class="header">
-    <div class="logo" aria-hidden="true">EC</div>
-    <div>
-      <h1>Emre Cecanpunar</h1>
-      <p class="title">Hi; I'm Emre. I have an interest in compilers, systems programming, and computer architecture, and I love applying that knowledge to performance optimization.</p>
-      <div class="contact" aria-label="İletişim ve bağlantılar">
-        <span class="chip">emreleno@gmail.com</span>
-        <span class="chip">+90 531 567 4235</span>
-        <span class="chip"><a href="https://www.linkedin.com/in/emre-c-227a76203/" target="_blank" rel="noopener">LinkedIn</a></span>
-        <span class="chip"><a href="https://github.com/emomaxd" target="_blank" rel="noopener">GitHub</a></span>
-        <span class="chip"><a href="./blog.html">Blog</a></span>
-      </div>
+    <div class="header">
+        <h1>Emre Cecanpunar</h1>
+        <div class="meta contact">
+            Contact: emreleno@gmail.com | <a href="cv.pdf">CV</a> | <a href="https://github.com/emomaxd">GitHub</a>
+        </div>
     </div>
-  </header>
+    <div class="meta">operating systems, low-level graphics & systems, performance engineering</div>
 
-  <div class="content">
-    <aside>
-      <section class="card">
-        <div class="label">Summary</div>
-        <p class="muted">Experienced compiler and operating systems engineer; work spans HPC and computer architecture with a strong focus on end‑to‑end performance engineering.</p>
-      </section>
+    <h2>Recent Posts</h2>
+    
+    <div class="post">
+        <h3><a href="posts/cpu-optimization.html">Advanced CPU Optimization Techniques</a></h3>
+        <div class="meta">2025-08-14</div>
+        <p>Instruction-level optimization, cache-friendly algorithms, and architectural considerations for modern processors. Covers SIMD utilization, memory hierarchies, and compiler intrinsics.</p>
+    </div>
 
-      <section class="card">
-        <div class="label">TOOLS & EXPERIENCE</div>
-        <ul class="bullet muted">
-          <li><strong>Languages:</strong> C, C++, Bash/Python (scripting)</li>
-          <li><strong>Profiling & Analysis:</strong> perf, gprof, Valgrind,
-		  Flamegraph, Intel VTune, Google Perfetto, Sanitizers</li>
-          <li><strong>Debug & Binary:</strong> gdb/lldb, objdump/hexdump,
-		  Ghidra, GHex</li>
-          <li><strong>Build & Toolchains:</strong> Make, CMake, LLVM/Clang, GCC</li>
-          <li><strong>OS & Kernel:</strong> Linux internals, kernel patching</li>
-          <li><strong>Math:</strong> Calculus, Linear Algebra, Trigonometry, Physics</li>
-        </ul>
-      </section>
+    <div class="post">
+        <h3><a href="posts/strength-reduction.html">Strength Reduction in Critical Paths</a></h3>
+        <div class="meta">2025-08-10</div>
+        <p>Replacing expensive operations with cheaper equivalents. Division by multiplication, modulo with bitwise AND, and other algebraic transformations.</p>
+    </div>
 
-      <section class="card">
-        <div class="label">PREFERRED WORK FIELDS</div>
-        <ul class="bullet muted">
-          <li>Compiler Development</li>
-          <li>OS Development</li>
-          <li>HPC — Low‑latency & Performance engineering</li>
-          <li>Computer Graphics</li>
-          <li>R&D</li>
-          <li>HW‑SW Co‑design</li>
-        </ul>
-      </section>
+    <div class="post">
+        <h3><a href="posts/branch-prediction.html">Branch Prediction and Control Flow</a></h3>
+        <div class="meta">2025-07-28</div>
+        <p>Minimizing branch mispredictions through code restructuring, conditional moves, and understanding predictor behavior.</p>
+    </div>
 
-      <section class="card">
-        <div class="label">EDUCATION</div>
-        <p class="muted">B.Sc. Computer Science & Engineering, Akdeniz University (2022 – 2026)</p>
-      </section>
-    </aside>
+    <div class="post">
+        <h3><a href="posts/cache-optimization.html">Cache-Conscious Data Structures</a></h3>
+        <div class="meta">2025-07-15</div>
+        <p>Data layout optimization, prefetching strategies, and cache line alignment for reduced memory stalls.</p>
+    </div>
 
-    <main>
-      <section>
-        <h2>Experience</h2>
-        <article class="exp-card">
-          <div class="exp-header">
-            <div>
-              <div class="exp-role">Embedded Software Developer Intern</div>
-              <div class="exp-company">Baykar Technologies</div>
-            </div>
-            <div class="exp-date">02/2025 – 06/2025</div>
-          </div>
-          <ul class="bullet">
-            <li>Worked on T3 Gemstone board, custom Linux distros, and embedded SDKs.</li>
-            <li>Ported NuttX to AM67A SoC; contributed to bootloaders, drivers, and Linux kernel internals.</li>
-            <li>Hands‑on with ARM SoCs, heterogeneous systems, remoteproc, JTAG, reverse engineering, low‑level debugging, and kernel configs.</li>
-          </ul>
-        </article>
+    <div class="post">
+        <h3><a href="posts/false-sharing.html">False Sharing Analysis</a></h3>
+        <div class="meta">2025-07-03</div>
+        <p>Cache line contention in multithreaded applications. Detection methods and mitigation strategies.</p>
+    </div>
 
-        <article class="exp-card">
-          <div class="exp-header">
-            <div>
-              <div class="exp-role">Software Engineer Intern</div>
-              <div class="exp-company">Teknodev</div>
-            </div>
-            <div class="exp-date">07/2024 – 08/2024</div>
-          </div>
-          <ul class="bullet">
-            <li>Developed reusable components; integrated new tech to improve performance and reduce delivery time across projects.</li>
-          </ul>
-        </article>
+    <div class="post">
+        <h3><a href="posts/tlb-management.html">TLB Optimization Strategies</a></h3>
+        <div class="meta">2025-06-20</div>
+        <p>Page size selection, memory access patterns, and address translation overhead reduction.</p>
+    </div>
 
-        <article class="exp-card">
-          <div class="exp-header">
-            <div>
-              <div class="exp-role">Embedded Software Developer</div>
-              <div class="exp-company">Atmaca Roket Takımı</div>
-            </div>
-            <div class="exp-date">09/2022 – 05/2023</div>
-          </div>
-          <ul class="bullet">
-            <li>Developed avionics software, LoRa comms, parachute algorithms, and Kalman GPS filtering.</li>
-            <li>Received 100% grade from TÜBİTAK for avionics report.</li>
-          </ul>
-        </article>
-      </section>
+    <div class="post">
+        <h3><a href="posts/memory-layout.html">Memory Layout and Alignment</a></h3>
+        <div class="meta">2025-06-08</div>
+        <p>Structure packing, padding optimization, and memory access pattern analysis for reduced cache misses and improved bandwidth utilization.</p>
+    </div>
 
-      <section>
-        <h2>Projects</h2>
-        <ul class="bullet">
-          <li><strong>Qbit:</strong> A game engine with OpenGL & Vulkan backend (Archived).</li>
-          <li><strong>Nyx:</strong> SIMD‑optimized zero‑dependency physics engine (Archived; not yet completed).</li>
-          <li>Contributions to Blender, LLVM, Apache NuttX.</li>
-          <li>Freelance: built 3 production‑grade websites with full‑stack ownership for real clients.</li>
-        </ul>
-      </section>
+    <div class="post">
+        <h3><a href="posts/vectorization.html">Auto-Vectorization and SIMD</a></h3>
+        <div class="meta">2025-05-25</div>
+        <p>Compiler vectorization hints, intrinsics usage, and loop transformations for maximum SIMD utilization across x86, ARM, and GPU architectures.</p>
+    </div>
 
-      <section>
-        <h2>Research & Interests</h2>
-        <ul class="bullet">
-          <li>Compilers & Toolchains</li>
-          <li>Operating Systems & Systems Programming</li>
-          <li>High Performance Computing (HPC)</li>
-          <li>Computer Architecture</li>
-        </ul>
-        <h2>Articles and Technical Writings</h2>
-<p class="muted">
-Advanced CPU Optimization: A Practitioner's Guide to Modern Performance Engineering
-</p>
-<div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-  <span class="chip"><a href="./posts/low-level-optimizations.html">Read Article</a></span>
-  <span class="chip"><a
-		  href="https://github.com/emomaxd/cpu-optimization-guide" target="_blank" rel="noopener">GitHub Repo</a></span>
-</div>
-      </section>
-    </main>
-  </div>
-</div>
+    <div class="post">
+        <h3><a href="posts/lock-free.html">Lock-Free Data Structures</a></h3>
+        <div class="meta">2025-05-12</div>
+        <p>Compare-and-swap primitives, memory ordering, and ABA problem solutions in high-performance concurrent programming.</p>
+    </div>
+
+    <div class="post">
+        <h3><a href="posts/profiling-guide.html">Performance Profiling Deep Dive</a></h3>
+        <div class="meta">2025-04-30</div>
+        <p>Hardware performance counters, flame graphs, and bottleneck identification using perf, Intel VTune, and custom instrumentation.</p>
+    </div>
+
+    <div class="post">
+        <h3><a href="posts/gpu-compute.html">GPU Compute Optimization</a></h3>
+        <div class="meta">2025-04-18</div>
+        <p>CUDA kernel optimization, memory coalescing, occupancy analysis, and cross-platform compute shader techniques.</p>
+    </div>
+
+    <div class="post">
+        <h3><a href="posts/compiler-opts.html">Compiler Optimization Internals</a></h3>
+        <div class="meta">2025-04-05</div>
+        <p>Understanding GCC and Clang optimization passes, PGO implementation details, and when to use assembly for critical sections.</p>
+    </div>
+
+    <hr>
 </body>
 </html>
