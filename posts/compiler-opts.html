@@ -1,0 +1,781 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Compiler Optimization Internals</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .benchmark {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>Compiler Optimization Internals</h1>
+    <div class="meta">2025-04-05 • ~10 min read</div>
+    
+    <p>Compilers transform your source code through dozens of optimization passes. Understanding GCC and Clang internals—from SSA form to profile-guided optimization—reveals when to trust the compiler and when to write assembly.</p>
+
+    <h2>Compilation Pipeline</h2>
+    <p>Modern compilers use multi-stage optimization:</p>
+
+    <pre>Source Code → Frontend → Optimizer → Backend → Assembly
+
+Frontend:
+- Lexical analysis (tokenization)
+- Syntactic analysis (AST generation)  
+- Semantic analysis (type checking)
+- IR generation (LLVM IR, GCC GIMPLE)
+
+Middle-end (Optimizer):
+- SSA form construction
+- Optimization passes (100+ passes in LLVM)
+- Inlining, constant folding, dead code elimination
+- Loop optimizations, vectorization
+
+Backend:  
+- Instruction selection
+- Register allocation
+- Instruction scheduling
+- Assembly generation</pre>
+
+    <h2>Static Single Assignment (SSA)</h2>
+    <p>Compiler internal representation where variables are assigned exactly once:</p>
+
+    <pre>// Original code
+int compute(int x) {
+    int y = x + 1;      // y assigned
+    if (x > 0) {
+        y = x * 2;      // y reassigned - not SSA
+    }
+    return y + x;
+}
+
+// SSA form
+int compute(int x_1) {
+    int y_1 = x_1 + 1;
+    if (x_1 > 0) {
+        y_2 = x_1 * 2;  // Different variable
+    }
+    y_3 = φ(y_1, y_2);  // φ function merges values
+    return y_3 + x_1;
+}
+
+// Benefits of SSA:
+// - Simplified dataflow analysis
+// - Easier constant propagation  
+// - Dead code elimination becomes trivial
+// - Register allocation simplified</pre>
+
+    <h2>Optimization Pass Ordering</h2>
+    <p>Pass order matters—some optimizations enable others:</p>
+
+    <pre>// GCC -O2 pass order (simplified)
+1.  cfg (Control Flow Graph construction)
+2.  ssa (SSA form construction)
+3.  ccp (Conditional Constant Propagation)
+4.  forwprop (Forward Propagation)  
+5.  phiopt (PHI optimization)
+6.  dce (Dead Code Elimination)
+7.  fre (Full Redundancy Elimination)
+8.  pre (Partial Redundancy Elimination)
+9.  sink (Code Sinking)
+10. vrp (Value Range Propagation)
+11. dom (Dominator optimization)
+12. dse (Dead Store Elimination)
+13. reassoc (Reassociation)
+14. loop (Loop optimization pass manager)
+15. vectorize (Loop vectorization)
+16. slp (SLP vectorization)
+17. unroll (Loop unrolling)
+18. inline (Function inlining)
+
+// Example: why order matters
+int x = 5;          // Constant
+int y = x + 0;      // After constant propagation: y = 5 + 0  
+int z = y;          // After constant folding: y = 5, then z = 5
+// Dead store elimination removes intermediate assignments</pre>
+
+    <h2>Function Inlining Heuristics</h2>
+    <p>Compiler decides what to inline based on complex cost models:</p>
+
+    <pre>// GCC inlining parameters
+--param inline-unit-growth=30          // Max function size growth %
+--param large-function-growth=100      // Growth limit for large functions  
+--param max-inline-insns-single=400    // Max instructions in single function
+--param max-inline-insns-auto=40       // Max for automatic inlining
+--param inline-min-speedup=10          // Required speedup %
+
+// Cost model factors
+Cost = (CallOverhead + ArgumentSetup) - (InstructionCount * Frequency)
+
+// Inlining decisions
+inline int small_function(int x) {
+    return x * 2 + 1;           // Always inlined - trivial
+}
+
+static int medium_function(int x, int y) {
+    // 50 instructions, called frequently → likely inlined
+}
+
+int large_function(complex_args) {
+    // 500 instructions → not inlined unless __attribute__((always_inline))
+}
+
+// Hot/cold splitting after PGO
+__attribute__((hot)) void frequently_called() { /* inlined */ }
+__attribute__((cold)) void error_handler() { /* not inlined */ }</pre>
+
+    <h2>Return Value Optimization (RVO)</h2>
+    <p>Eliminates temporaries and copies in return statements:</p>
+
+    <pre>// Named Return Value Optimization (NRVO)
+std::vector<int> create_vector(int size) {
+    std::vector<int> result;    // Constructed in caller's space
+    result.reserve(size);
+    for (int i = 0; i < size; i++) {
+        result.push_back(i);
+    }
+    return result;              // No copy - direct construction
+}
+
+// Copy Elision (RVO)
+Matrix multiply(const Matrix& a, const Matrix& b) {
+    return Matrix(a.rows(), b.cols(), a.data() * b.data());
+    // Temporary constructed directly in return location
+}
+
+// When RVO fails
+Matrix conditional_return(bool flag) {
+    Matrix a, b;
+    if (flag) return a;         // Multiple return objects
+    return b;                   // RVO not possible
+}
+
+// Guaranteed copy elision (C++17)
+struct Widget {
+    Widget(int);                // Constructor
+    Widget(const Widget&) = delete; // No copy constructor
+};
+
+Widget factory() {
+    return Widget(42);          // Always elided, even with deleted copy ctor
+}</pre>
+
+    <h2>Loop Optimizations</h2>
+    <p>Extensive loop transformation passes:</p>
+
+    <pre>// Loop Invariant Code Motion (LICM)
+for (int i = 0; i < n; i++) {
+    int constant_expr = expensive_function(x, y);  // Moved outside loop
+    array[i] = array[i] + constant_expr;
+}
+
+// After LICM
+int temp = expensive_function(x, y);               // Hoisted
+for (int i = 0; i < n; i++) {
+    array[i] = array[i] + temp;
+}
+
+// Induction Variable Optimization
+for (int i = 0; i < n; i++) {
+    array[i*4] = value;         // i*4 is induction variable
+}
+
+// Optimized to pointer arithmetic
+int* ptr = array;
+for (int i = 0; i < n; i++, ptr += 4) {
+    *ptr = value;               // Eliminate multiplication
+}
+
+// Loop Unrolling Strategies
+#pragma GCC unroll 8           // Manual unroll factor
+for (int i = 0; i < n; i++) {
+    process(data[i]);
+}
+
+// Complete unrolling (small known bounds)
+for (int i = 0; i < 4; i++) {   // Completely unrolled
+    result += matrix[i][j];
+}
+// Becomes: result += matrix[0][j] + matrix[1][j] + matrix[2][j] + matrix[3][j];
+
+// Loop Interchange for Cache Locality
+for (int i = 0; i < N; i++) {
+    for (int j = 0; j < N; j++) {
+        for (int k = 0; k < N; k++) {
+            C[i][j] += A[i][k] * B[k][j];    // Bad cache access pattern
+        }
+    }
+}
+
+// After interchange (ikj order)
+for (int i = 0; i < N; i++) {
+    for (int k = 0; k < N; k++) {
+        for (int j = 0; j < N; j++) {
+            C[i][j] += A[i][k] * B[k][j];    // Better cache locality
+        }
+    }
+}</pre>
+
+    <h2>Constant Propagation and Folding</h2>
+    <p>Aggressive compile-time evaluation:</p>
+
+    <pre>// Inter-procedural Constant Propagation
+const int BUFFER_SIZE = 1024;
+const float PI = 3.14159f;
+
+static int calculate_area(int radius) {
+    return PI * radius * radius;    // PI is constant across compilation unit
+}
+
+void process_data() {
+    char buffer[BUFFER_SIZE];       // Size known at compile time
+    int area = calculate_area(5);   // Folded to 78.5398 at compile time
+    
+    // Conditional constant propagation
+    if (BUFFER_SIZE > 512) {        // Always true
+        optimized_large_buffer_code();
+    } else {
+        // Dead code - eliminated
+    }
+}
+
+// Template-based constant propagation
+template<int N>
+void unroll_loop() {
+    #pragma unroll N               // N is template parameter
+    for (int i = 0; i < N; i++) {
+        process(data[i]);           // Completely unrolled
+    }
+}
+
+// Constexpr evaluation (C++11+)
+constexpr int factorial(int n) {
+    return (n <= 1) ? 1 : n * factorial(n - 1);
+}
+
+int array[factorial(5)];            // Array size computed at compile time</pre>
+
+    <h2>Dead Code Elimination</h2>
+    <p>Remove unreachable and unused code:</p>
+
+    <pre>// Unreachable Code Elimination
+if (false) {
+    expensive_operation();          // Dead code - removed
+    complex_computation();
+}
+
+// Dead Store Elimination  
+int compute() {
+    int x = 5;                      // Dead store
+    x = 10;                         // Only this assignment kept
+    int y = 20;                     // Dead store - y never used
+    return x;
+}
+
+// Becomes:
+int compute() {
+    return 10;                      // Constant propagated
+}
+
+// Dead Variable Elimination
+void function() {
+    int unused_var = expensive_call();  // If unused_var never read,
+                                       // entire call eliminated
+    // ... code not using unused_var
+}
+
+// Side-effect analysis prevents incorrect elimination
+volatile int* global_ptr;
+void careful_elimination() {
+    int result = read_from_hardware();   // Has side effects - kept
+    *global_ptr = 42;                   // Volatile write - kept
+}</pre>
+
+    <h2>Profile-Guided Optimization (PGO)</h2>
+    <p>Use runtime profiling data to guide optimization decisions:</p>
+
+    <pre># Three-stage PGO workflow
+# Stage 1: Compile with instrumentation
+gcc -fprofile-generate -O2 source.c -o program_instrumented
+
+# Stage 2: Run with representative workload
+./program_instrumented < typical_input.dat
+# Generates .gcda profile data files
+
+# Stage 3: Compile with profile data
+gcc -fprofile-use -O2 source.c -o program_optimized
+
+# PGO optimizations enabled:
+- Branch probability weighting
+- Hot/cold function splitting  
+- Inlining decisions based on call frequency
+- Loop unrolling based on iteration counts
+- Function layout for better cache locality
+
+// Hot/cold function splitting
+void hot_path() __attribute__((hot)) {
+    // Frequently executed code
+    // Placed together in .text.hot section
+}
+
+void cold_error_handler() __attribute__((cold)) {
+    // Rarely executed code  
+    // Moved to .text.cold section
+}
+
+// Branch probability affects code layout
+if (__builtin_expect(rare_condition, 0)) {  // Hint: unlikely
+    handle_rare_case();                     // Moved out of hot path
+}
+
+// AutoFDO (Automatic Feedback-Directed Optimization)
+perf record -b -e cycles:u ./program < input
+create_llvm_prof -binary=./program -perf=perf.data -out=program.prof
+clang -fprofile-sample-use=program.prof -O2 source.c</pre>
+
+    <h2>Link-Time Optimization (LTO)</h2>
+    <p>Whole-program optimization across translation units:</p>
+
+    <pre># Enable LTO
+gcc -flto -O2 file1.c file2.c file3.c -o program
+
+# What LTO enables:
+- Inter-procedural optimization across files
+- Dead code elimination of unused functions
+- Constant propagation across translation units
+- Function inlining across files
+- Virtual function devirtualization
+
+// Example: cross-file optimization
+// file1.c
+static const int THRESHOLD = 100;      // Internal linkage
+void process_data(int* data, int size) {
+    for (int i = 0; i < size; i++) {
+        if (data[i] > THRESHOLD) {     // THRESHOLD propagated
+            expensive_operation(data[i]);
+        }
+    }
+}
+
+// file2.c  
+extern void process_data(int*, int);
+int main() {
+    int data[] = {50, 150, 75};       // Known at link time
+    process_data(data, 3);            // Can be completely inlined + optimized
+}
+
+// With LTO: entire call optimized to:
+int main() {
+    expensive_operation(150);         // Only call that passes threshold
+}</pre>
+
+    <h2>Auto-Vectorization Analysis</h2>
+    <p>Compiler attempts to generate SIMD code:</p>
+
+    <pre># Vectorization reports
+gcc -O3 -march=native -fopt-info-vec-all source.c
+# Shows which loops vectorized and why others failed
+
+// Successful vectorization
+void simple_add(float* a, float* b, float* c, int n) {
+    for (int i = 0; i < n; i++) {      // Vectorized to AVX
+        c[i] = a[i] + b[i];
+    }
+}
+
+// Vectorization failure: dependency
+void running_sum(float* data, int n) {
+    for (int i = 1; i < n; i++) {
+        data[i] += data[i-1];          // Loop-carried dependency
+    }
+}
+
+// Vectorization failure: complex control flow
+void conditional_process(float* data, int n) {
+    for (int i = 0; i < n; i++) {
+        if (data[i] > 0.5f) {          // Unpredictable branch
+            data[i] = sqrt(data[i]);
+        } else {
+            data[i] = data[i] * data[i];
+        }
+    }
+}
+
+// Help vectorizer with pragmas
+#pragma GCC ivdep                     // Ignore vector dependencies
+#pragma omp simd                      // Force SIMD generation
+for (int i = 0; i < n; i++) {
+    process(data[i]);
+}</pre>
+
+    <h2>Register Allocation</h2>
+    <p>Map unlimited virtual registers to limited physical registers:</p>
+
+    <pre>// Register allocation algorithms
+Linear Scan: Fast compilation, decent quality
+Graph Coloring: Better quality, slower compilation  
+Live Range Splitting: Handle complex cases
+
+// Register pressure example
+void high_pressure() {
+    int r1 = load1(), r2 = load2(), r3 = load3(), r4 = load4();
+    int r5 = load5(), r6 = load6(), r7 = load7(), r8 = load8();
+    int r9 = load9(), r10 = load10(), r11 = load11(), r12 = load12();
+    
+    // x86-64 has ~16 general purpose registers
+    // If more live variables: register spilling to stack
+    
+    int result = r1*r2 + r3*r4 + r5*r6 + r7*r8 + r9*r10 + r11*r12;
+    return result;
+}
+
+// Compiler analysis
+Live range analysis: Determine variable lifetimes
+Interference graph: Which variables conflict  
+Spill cost analysis: Choose cheapest variables to spill
+
+// Register allocation hints
+register int frequently_used;          // Hint (mostly ignored by modern compilers)
+__attribute__((hot)) int hot_variable; // Priority hint</pre>
+
+    <h2>Instruction Scheduling</h2>
+    <p>Reorder instructions to avoid pipeline stalls:</p>
+
+    <pre>// Original code
+int a = load_from_memory();    // High latency
+int b = x + y;                 // Low latency  
+int c = a + z;                 // Depends on 'a'
+
+// After instruction scheduling  
+int b = x + y;                 // Execute first (no dependencies)
+int a = load_from_memory();    // Issue load early
+int c = a + z;                 // Execute when 'a' ready
+
+// List scheduling algorithm
+1. Build dependency DAG
+2. Compute instruction priorities  
+3. Schedule ready instructions first
+4. Update ready list as dependencies satisfy
+
+// Software pipelining (for loops)
+for (int i = 0; i < n; i++) {
+    int a = load(data[i]);     // Stage 1: Load
+    int b = process(a);        // Stage 2: Process  
+    store(result[i], b);       // Stage 3: Store
+}
+
+// Pipelined version overlaps stages:
+// Iteration i:   Load[i+1], Process[i], Store[i-1]</pre>
+
+    <h2>Compiler Memory Reordering</h2>
+    <p>Compiler can reorder memory operations for optimization—unless you prevent it:</p>
+
+    <pre>// Source code
+int flag = 0;
+int data = 0;
+
+void producer() {
+    data = 42;          // Store 1
+    flag = 1;           // Store 2 - signals data ready
+}
+
+void consumer() {
+    if (flag) {         // Load 1
+        use(data);      // Load 2 - expects data = 42
+    }
+}
+
+// Compiler may reorder to:
+void producer_reordered() {
+    flag = 1;           // Reordered! Signals before data ready
+    data = 42;          // Race condition possible
+}
+
+// Solution: compiler barriers
+void producer_safe() {
+    data = 42;
+    __asm__ volatile("" ::: "memory");  // Compiler barrier
+    flag = 1;
+}
+
+// Or use volatile
+volatile int flag = 0;
+int data = 0;
+
+void producer_volatile() {
+    data = 42;          // Can be reordered relative to non-volatile
+    flag = 1;           // Cannot be reordered - volatile semantics
+}</pre>
+
+    <h2>Memory Ordering Semantics</h2>
+    <p>C++11 atomic operations provide precise memory ordering control:</p>
+
+    <pre>// Memory ordering levels
+std::memory_order_relaxed:  No ordering constraints
+std::memory_order_acquire:  Load-acquire semantics
+std::memory_order_release:  Store-release semantics
+std::memory_order_acq_rel:  Both acquire and release
+std::memory_order_seq_cst:  Sequential consistency (default)
+
+// Release-acquire pattern
+std::atomic<int> flag{0};
+int data = 0;
+
+void producer() {
+    data = 42;                              // Regular store
+    flag.store(1, std::memory_order_release); // Release: no reordering past this
+}
+
+void consumer() {
+    if (flag.load(std::memory_order_acquire) == 1) { // Acquire
+        assert(data == 42);                 // Guaranteed to see data = 42
+    }
+}
+
+// Relaxed ordering - maximum performance
+std::atomic<int> counter{0};
+void increment() {
+    counter.fetch_add(1, std::memory_order_relaxed); // No synchronization overhead
+}
+
+// Sequential consistency - strongest guarantee
+std::atomic<int> x{0}, y{0};
+void thread1() {
+    x.store(1);                            // seq_cst by default
+    int r1 = y.load();
+}
+void thread2() {
+    y.store(1);
+    int r2 = x.load();
+}
+// Guarantees: !(r1 == 0 && r2 == 0) in sequential consistency</pre>
+
+    <h2>Compiler Optimization vs Memory Models</h2>
+    <p>How different optimizations interact with memory ordering:</p>
+
+    <pre>// Dead store elimination with atomics
+std::atomic<int> shared{0};
+void careful_optimization() {
+    shared.store(1);
+    shared.store(2);    // Dead store elimination cannot remove this
+                       // Other threads might observe intermediate value
+}
+
+// Loop-invariant code motion with memory barriers
+void memory_barrier_interaction(std::atomic<bool>& flag) {
+    for (int i = 0; i < 1000; i++) {
+        int expensive = compute_something();    // LICM wants to move this out
+        flag.store(true, std::memory_order_release);
+        // Compiler cannot hoist expensive computation past release
+    }
+}
+
+// Register allocation with volatile
+volatile int hardware_register;
+void register_allocation_limits() {
+    int local_copy = hardware_register;     // Must reload each time
+    for (int i = 0; i < 1000; i++) {
+        if (local_copy > threshold) {       // Cannot cache in register
+            process(local_copy);
+        }
+        local_copy = hardware_register;     // Cannot eliminate reload
+    }
+}
+
+// Constant propagation limitations
+extern volatile int config_value;
+void conditional_compilation() {
+    if (config_value == DEBUG_MODE) {      // Cannot constant-fold
+        debug_operations();                // Cannot eliminate as dead code
+    }
+}</pre>
+
+    <h2>Compiler Barriers and Fences</h2>
+    <p>Different types of barriers for different guarantees:</p>
+
+    <pre>// Full compiler barrier (GCC/Clang)
+#define COMPILER_BARRIER() __asm__ volatile("" ::: "memory")
+
+void barrier_example() {
+    int a = load_a();
+    COMPILER_BARRIER();     // Prevents reordering across this point
+    int b = load_b();       // Compiler won't move this before barrier
+}
+
+// Microsoft Visual C++ barrier
+void msvc_barrier() {
+    int a = load_a();
+    _ReadWriteBarrier();    // MSVC compiler barrier
+    int b = load_b();
+}
+
+// Atomic thread fence (hardware + compiler barrier)
+void full_fence_example() {
+    data = 42;
+    std::atomic_thread_fence(std::memory_order_release); // HW + compiler barrier
+    flag = 1;
+}
+
+// Specialized barriers
+#ifdef __x86_64__
+#define LOAD_FENCE()  __asm__ volatile("lfence" ::: "memory")
+#define STORE_FENCE() __asm__ volatile("sfence" ::: "memory")  
+#define FULL_FENCE()  __asm__ volatile("mfence" ::: "memory")
+#endif</pre>
+
+    <h2>Volatile Semantics and Optimization</h2>
+    <p>Volatile prevents certain optimizations but not others:</p>
+
+    <pre>// What volatile prevents
+volatile int mmio_register;
+void volatile_behavior() {
+    mmio_register = 1;      // Cannot eliminate store
+    mmio_register = 2;      // Cannot eliminate this store either
+    
+    int val1 = mmio_register; // Cannot cache across volatile accesses
+    int val2 = mmio_register; // Must reload from memory
+}
+
+// What volatile doesn't prevent
+volatile int flag = 0;
+int data = 0;
+
+void volatile_limitations() {
+    data = 42;              // Can be reordered past volatile operations
+    flag = 1;               // Volatile store
+    // Compiler can move data = 42 after flag = 1
+}
+
+// Volatile doesn't provide atomicity
+volatile long long counter = 0;
+void non_atomic_volatile() {
+    counter++;              // Not atomic on 32-bit systems
+                           // Might become: load, increment, store
+                           // Race condition possible
+}
+
+// Proper atomic volatile combination
+volatile std::atomic<int> atomic_mmio;
+void proper_mmio_atomic() {
+    atomic_mmio.store(42);  // Atomic + prevents optimization
+}</pre>
+    <p>Situations requiring manual optimization:</p>
+
+    <pre>// Aliasing uncertainty
+void matrix_multiply(float* A, float* B, float* C, int n) {
+    // Compiler assumes A, B, C might overlap
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            for (int k = 0; k < n; k++) {
+                C[i*n+j] += A[i*n+k] * B[k*n+j];  // Conservative optimization
+            }
+        }
+    }
+}
+
+// Solution: restrict keyword
+void matrix_multiply_opt(float* __restrict__ A, 
+                        float* __restrict__ B, 
+                        float* __restrict__ C, int n) {
+    // Compiler knows no overlap - aggressive optimization
+}
+
+// Complex optimization patterns
+void custom_memcpy(void* dest, const void* src, size_t n) {
+    // Hand-optimized assembly might beat compiler for specific sizes
+    if (n == 16) {
+        // Use single 128-bit SIMD load/store
+        __m128i data = _mm_loadu_si128((const __m128i*)src);
+        _mm_storeu_si128((__m128i*)dest, data);
+    } else {
+        // Fall back to library implementation
+        memcpy(dest, src, n);
+    }
+}
+
+// Domain-specific optimizations
+void dsp_filter(float* signal, float* coeffs, int n) {
+    // Audio processing: hand-tuned SIMD + prefetching
+    // might outperform general vectorization
+}</pre>
+
+    <div class="benchmark">
+        <strong>Optimization impact (matrix multiply 512x512)</strong><br>
+        -O0 (no optimization): <strong>12.3s</strong><br>
+        -O2 (standard): <strong>2.8s</strong> (4.4x faster)<br>
+        -O3 + LTO: <strong>1.9s</strong> (6.5x faster)<br>
+        -O3 + LTO + PGO: <strong>1.2s</strong> (10.3x faster)<br>
+        Hand-optimized + intrinsics: <strong>0.6s</strong> (20.5x faster)
+    </div>
+
+    <h2>Optimization Debugging</h2>
+    <p>Understanding what the compiler did:</p>
+
+    <pre># Assembly output
+gcc -S -O2 source.c                   # Generate assembly
+gcc -c -g -Wa,-alh source.c           # Mixed C/assembly listing  
+
+# Optimization reports  
+gcc -fopt-info-all source.c           # All optimization info
+clang -Rpass=.* source.c              # LLVM pass information
+
+# Intermediate representations
+gcc -fdump-tree-all source.c          # All tree dumps
+clang -emit-llvm source.c             # LLVM IR output
+
+# Profile compiler itself
+gcc -ftime-report source.c            # Compilation time breakdown
+clang -ftime-trace source.c           # Chrome trace format
+
+# Compare optimizations
+gcc -O2 -S -o opt2.s source.c
+gcc -O3 -S -o opt3.s source.c  
+diff -u opt2.s opt3.s                 # See what O3 adds</pre>
+
+    <h2>Bottom Line</h2>
+    <p>Modern compilers perform hundreds of optimization passes. SSA form enables powerful dataflow analysis. PGO provides 15-30% speedups on real workloads. LTO enables whole-program optimization. Auto-vectorization works for simple loops but needs help for complex patterns. When compiler optimization isn't enough, profile first, then hand-optimize critical paths with intrinsics or assembly.</p>
+
+    <p><a href="../index.html">← Back</a></p>
+</body>
+</html>
