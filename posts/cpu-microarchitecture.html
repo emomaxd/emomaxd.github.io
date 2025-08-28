@@ -1,0 +1,499 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>CPU Microarchitecture Deep Dive</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .benchmark {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>CPU Microarchitecture Deep Dive</h1>
+    <div class="meta">2025-06-12 • ~9 min read</div>
+    
+    <p>Modern CPUs are 20-stage pipelined, 6-wide superscalar, out-of-order execution engines with speculative execution, register renaming, and complex branch prediction. Understanding the hardware determines how fast your code runs.</p>
+
+    <h2>Pipeline Architecture</h2>
+    <p>Modern x86 processors have deep, complex pipelines:</p>
+
+    <pre>Intel Core Pipeline (14-19 stages):
+Front-end: Fetch → Predecode → Decode → Uop Cache → Rename
+Back-end:  Schedule → Execute → Writeback → Retire
+
+AMD Zen Pipeline (12-17 stages):
+Fetch → Decode → Dispatch → Schedule → Execute → Retire
+
+ARM Cortex-A78 (13 stages):
+Fetch → Decode → Rename → Dispatch → Issue → Execute → Writeback
+
+Pipeline depth tradeoffs:
++ Deeper = higher frequency possible
+- Deeper = larger branch misprediction penalty
+- Deeper = more complex hazard handling</pre>
+
+    <h2>Superscalar Execution</h2>
+    <p>Multiple instructions processed simultaneously:</p>
+
+    <pre>Intel Core i7 execution resources:
+- 6 uops/cycle decode width
+- 8 uops/cycle rename width  
+- 180+ physical registers (integer)
+- 168+ physical registers (vector)
+- 10 execution ports:
+  Port 0: ALU, MUL, DIV, Branch
+  Port 1: ALU, MUL, Shift, Branch
+  Port 2,3: Load (AGU + Data)
+  Port 4: Store Data
+  Port 5: ALU, Shift, Branch  
+  Port 6: ALU, Shift, Branch
+  Port 7: Store Address
+  Port 8: Store Address
+  Port 9,10: Load
+
+// Code utilizing multiple ports
+for (int i = 0; i < n; i++) {
+    a[i] = b[i] + c[i];      // Port 0/1/5/6: ADD, Port 2/3: Load, Port 4/7: Store
+    d[i] = e[i] & f[i];      // Port 0/1/5/6: AND, Port 2/3: Load, Port 4/7: Store
+    g[i] = h[i] << 2;        // Port 0/1/5/6: Shift, Port 2/3: Load, Port 4/7: Store
+}
+// Can achieve ~4-6 uops/cycle throughput</pre>
+
+    <h2>Register Renaming Deep Dive</h2>
+    <p>Eliminate false dependencies with physical register pool:</p>
+
+    <pre>// x86 architectural registers: 16 (RAX-R15)
+// x86 physical registers: 180+ integer, 168+ vector
+
+// Source code creates false dependencies
+void false_dependency_example() {
+    int eax = load1();       // eax = result1
+    store1(eax);             // use result1
+    
+    int eax = load2();       // Reuse eax - WAW hazard!
+    store2(eax);             // use result2
+}
+
+// Hardware register renaming
+void after_renaming() {
+    int P37 = load1();       // Physical register P37
+    store1(P37);
+    
+    int P52 = load2();       // Different physical register P52
+    store2(P52);             // No dependency - can execute in parallel
+}
+
+// Register pressure example
+void high_register_pressure() {
+    // Compiler allocates variables to registers
+    int a1 = load(), a2 = load(), a3 = load(), a4 = load();
+    int a5 = load(), a6 = load(), a7 = load(), a8 = load();
+    int a9 = load(), a10 = load(), a11 = load(), a12 = load();
+    
+    // If more live variables than registers: spilling to stack
+    int result = a1*a2 + a3*a4 + a5*a6 + a7*a8 + a9*a10 + a11*a12;
+}</pre>
+
+    <h2>Out-of-Order Execution Engine</h2>
+    <p>Reorder execution while preserving program semantics:</p>
+
+    <pre>// Reservation Stations (Tomasulo's Algorithm)
+Intel Core: 97 reservation station entries
+AMD Zen: 72 reservation station entries  
+
+// Instruction scheduling
+void ooo_example() {
+    int a = load_cache_miss();    // 300+ cycles (L3 miss)
+    int b = 5 + 7;                // 1 cycle  
+    int c = 10 * 20;              // 3 cycles (multiply)
+    int d = a + b;                // Waits for 'a' and 'b'
+}
+
+// Execution timeline (out-of-order)
+Cycle 1:   Issue load for 'a'
+Cycle 2:   Execute b = 5 + 7           (doesn't wait for 'a')
+Cycle 5:   Execute c = 10 * 20         (independent)
+Cycle 305: Load 'a' completes
+Cycle 306: Execute d = a + b           (both operands ready)
+
+// Retirement: in-order commit to preserve correctness
+Retirement Order: a → b → c → d (original program order)</pre>
+
+    <h2>Branch Prediction Mechanisms</h2>
+    <p>Multiple prediction structures work together:</p>
+
+    <pre>// Branch predictor components
+Two-level Adaptive Predictor:
+- Global History Register (GHR): last N branch directions
+- Pattern History Table (PHT): 2-bit saturating counters
+- Branch Target Buffer (BTB): branch target addresses
+
+// Prediction algorithms
+Simple 2-bit predictor:
+00 (Strong Not-Taken) → 01 (Weak Not-Taken) → 11 (Weak Taken) → 10 (Strong Taken)
+
+// Tournament predictor (combines multiple predictors)
+Intel: Local + Global + Loop predictors → Meta-predictor chooses best
+
+// Advanced: TAGE predictor (Tagged Geometric)
+Multiple history tables with different lengths (8, 16, 32, 64, 128 branches)
+
+// Return stack buffer (RSB)
+void function_call_prediction() {
+    call_function();  // Push return address to RSB
+    // ...
+}  // Pop from RSB for return prediction</pre>
+
+    <h2>Speculative Execution</h2>
+    <p>Execute instructions before knowing if they'll be needed:</p>
+
+    <pre>// Branch speculation
+if (unlikely_condition()) {
+    expensive_operation_A();     // Speculatively executed
+    complex_computation();
+} else {
+    simple_operation_B();       // Also speculatively executed  
+}
+
+// Memory disambiguation speculation
+void memory_speculation(int* a, int* b) {
+    a[0] = 42;                  // Store
+    int x = b[0];               // Load - may alias with a[0]
+    
+    // Hardware speculates no aliasing
+    // Executes load before store address known
+    // If aliasing detected: pipeline flush + re-execute
+}
+
+// Load speculation (Alpha 21264 style)
+int speculative_load(int* ptr, int condition) {
+    int value = *ptr;           // Speculative load
+    if (condition) {
+        return value;           // Speculation was correct
+    }
+    // If speculation wrong: squash and re-execute
+    return 0;
+}</pre>
+
+    <h2>Cache and Memory Subsystem</h2>
+    <p>Multi-level cache hierarchy with complex coherency:</p>
+
+    <pre>// Typical cache hierarchy
+L1I Cache: 32KB, 8-way, 64B lines, 4 cycle latency
+L1D Cache: 32KB, 8-way, 64B lines, 4 cycle latency  
+L2 Cache:  256KB, 8-way, 64B lines, 12 cycle latency
+L3 Cache:  8MB, 16-way, 64B lines, 40 cycle latency
+Memory:    16GB, 200-400 cycle latency
+
+// Cache coherency protocols (MESI/MOESI)
+Modified (M):   Dirty, owned by this core
+Exclusive (E):  Clean, owned by this core
+Shared (S):     Clean, shared by multiple cores  
+Invalid (I):    Not present in this cache
+
+// False sharing example
+struct SharedData {
+    volatile int counter_core0;  // Used by core 0
+    volatile int counter_core1;  // Used by core 1 - same cache line!
+};
+// Result: cache line ping-pongs between cores</pre>
+
+    <h2>Hardware Memory Reordering</h2>
+    <p>CPU can execute memory operations out-of-order for performance:</p>
+
+    <pre>// Memory ordering models by architecture
+x86/x86-64 (Strong ordering):
+- Stores cannot pass stores (store-store ordering)
+- Loads cannot pass loads (load-load ordering)  
+- Loads cannot pass stores (load-store ordering)
+- Stores CAN pass loads (only allowed reordering)
+
+ARM/ARM64 (Weak ordering):
+- All memory operations can be reordered
+- Requires explicit barriers for ordering
+
+RISC-V (Weak ordering):
+- Similar to ARM, explicit fence instructions needed
+
+PowerPC (Weak ordering):
+- Aggressive reordering, sync instructions required</pre>
+
+    <h2>Store Buffer and Memory Ordering</h2>
+    <p>Store buffer enables store-to-load forwarding but allows reordering:</p>
+
+    <pre>// Classic example: Store-Load reordering on x86
+int x = 0, y = 0;
+
+// Thread 1                    // Thread 2
+void thread1() {               void thread2() {
+    x = 1;     // Store         y = 1;     // Store  
+    int r1 = y; // Load         int r2 = x; // Load
+}
+
+// Possible outcome: r1 = 0, r2 = 0 (both loads see old values)
+// Hardware execution:
+// 1. Both stores go to store buffer
+// 2. Both loads execute before stores commit to cache  
+// 3. Loads see old cached values
+
+// Prevention: memory fence
+void thread1_fenced() {
+    x = 1;
+    __asm__ volatile("mfence" ::: "memory");  // x86 full fence
+    int r1 = y;
+}
+
+// Store buffer forwarding
+void store_forwarding_example() {
+    *(int*)address = 42;        // Store to buffer
+    int value = *(int*)address; // Forwarded from buffer (fast)
+    
+    // Forwarding can fail with size/alignment mismatches
+    *(int*)address = 0x12345678;      // 4-byte store
+    char low_byte = *(char*)address;   // 1-byte load - forwarding works
+    short word = *(short*)(address+1); // Misaligned - forwarding fails, stall
+}</pre>
+
+    <h2>Cache Coherency and Memory Ordering</h2>
+    <p>Multi-core systems require coherent view of memory:</p>
+
+    <pre>// MESI protocol transitions
+Modified → Shared:    Response to read request from other core
+Exclusive → Invalid: Other core writes to same cache line
+Shared → Invalid:     Other core gets exclusive access
+
+// Memory ordering vs cache coherency
+int data = 0;
+volatile int flag = 0;
+
+// Core 1                     // Core 2
+void producer() {             void consumer() {
+    data = 42;    // (1)       while (flag == 0); // (3)
+    flag = 1;     // (2)       assert(data == 42); // (4)
+}
+
+// Execution order possibilities:
+// Strong ordering (x86): (1) → (2) → (3) → (4) ✓ Always works
+// Weak ordering (ARM): (1) and (2) can be reordered
+//   If (2) happens before (1): Core 2 sees flag=1 but data=0
+
+// ARM solution: memory barriers
+void producer_arm() {
+    data = 42;                          // Store
+    __asm__ volatile("dmb st" ::: "memory"); // Data Memory Barrier (store)
+    flag = 1;                          // Store cannot be reordered past DMB
+}
+
+void consumer_arm() {
+    while (flag == 0);                 // Load
+    __asm__ volatile("dmb ld" ::: "memory"); // Data Memory Barrier (load)
+    assert(data == 42);                // Load cannot be reordered past DMB
+}</pre>
+
+    <h2>Weak vs Strong Memory Models</h2>
+    <p>Architecture differences in memory ordering guarantees:</p>
+
+    <pre>// x86 Total Store Ordering (TSO)
+Guarantees:
+✓ Store → Store ordering preserved
+✓ Load → Load ordering preserved  
+✓ Load → Store ordering preserved
+✗ Store → Load can be reordered (store buffer effect)
+
+Example safe on x86, broken on ARM:
+// Thread 1: x = 1; r1 = y;
+// Thread 2: y = 1; r2 = x;
+// x86: Cannot have r1=0, r2=0 simultaneously
+// ARM: Can have r1=0, r2=0 (both reordered)
+
+// ARM weak ordering
+No guarantees without explicit barriers:
+- All loads and stores can be reordered
+- Requires DMB (Data Memory Barrier) instructions
+- Load-acquire/Store-release instructions provide ordering
+
+// ARM barrier types
+DMB SY:   Full system barrier (all memory operations)
+DMB ST:   Store barrier (stores cannot pass)
+DMB LD:   Load barrier (loads cannot pass)  
+DSB:      Data Synchronization Barrier (stronger than DMB)
+ISB:      Instruction Synchronization Barrier</pre>
+    <p>Complex memory operation handling:</p>
+
+    <pre>// Store-to-load forwarding
+*(int*)address = value;         // Store 
+int x = *(int*)address;         // Load same address
+
+// Hardware forwarding cases:
+Exact match:     4-byte store, 4-byte load same address ✓
+Subset:          4-byte store, 2-byte load within      ✓  
+Partial overlap: 4-byte store, 4-byte load offset +2  ✗ (block)
+
+// Store buffer
+Intel: 56-entry store buffer
+AMD: 44-entry store buffer
+
+// Memory ordering (x86 is strongly ordered)
+Store-Store:  Stores execute in program order
+Load-Load:    Loads can be reordered  
+Load-Store:   Loads can be reordered with later stores
+Store-Load:   Can be reordered (weakest ordering)</pre>
+
+    <h2>Instruction Decode and Micro-ops</h2>
+    <p>Complex x86 instructions become simpler micro-operations:</p>
+
+    <pre>// x86 instruction decoding
+add eax, [ebx + ecx*4 + 16]    // Single x86 instruction
+
+// Decoded to multiple uops:
+uop1: load_address = ebx + ecx*4 + 16     // Address generation
+uop2: temp = load(load_address)           // Memory load
+uop3: eax = eax + temp                    // Addition
+
+// Micro-op cache (Intel)
+Decoded uops cached to avoid re-decoding
+1.5K uops capacity
+6 uops/cycle delivery bandwidth
+
+// Complex instructions
+rep movsb                      // String move - many uops
+imul eax, [ebx], 12           // Memory operand multiply - 2 uops  
+push eax                      // Stack operation - 1 uop</pre>
+
+    <h2>SMT (Simultaneous Multithreading)</h2>
+    <p>Multiple hardware threads share execution resources:</p>
+
+    <pre>// Intel Hyperthreading (2-way SMT)
+Shared resources:
+- Execution units (ALU, FPU, etc.)
+- Caches (L1, L2, L3)  
+- Branch predictors
+
+Per-thread resources:
+- Architectural registers
+- Program counter
+- Some reservation stations
+
+// SMT performance characteristics
+Single thread: 100% performance
+Two threads: 120-130% total performance (not 200%)
+- Resource contention limits scalability
+- Memory-bound workloads see less benefit
+
+// Thread scheduling
+void smt_awareness() {
+    // Thread A: CPU-intensive
+    for (int i = 0; i < n; i++) {
+        result += heavy_computation(data[i]);
+    }
+    
+    // Thread B: Memory-intensive  
+    for (int i = 0; i < n; i++) {
+        result += memory_intensive_operation(data[i]);
+    }
+    // Good pairing - different resource usage
+}</pre>
+
+    <h2>Performance Monitoring</h2>
+    <p>Hardware performance counters reveal microarchitecture behavior:</p>
+
+    <pre># Key performance counters
+perf stat -e cycles,instructions,\
+uops_retired.retire_slots,\
+uops_issued.any,\
+br_misp_retired.all_branches,\
+mem_load_retired.l3_miss,\
+resource_stalls.any ./program
+
+# Derived metrics
+IPC = instructions / cycles                    # Instructions per cycle
+UPC = uops_retired / cycles                   # Uops per cycle  
+Branch MPKI = branch_misses / (instructions/1000)  # Misses per 1K instructions
+L3 MPKI = l3_misses / (instructions/1000)     # L3 misses per 1K instructions
+
+# Intel VTune analysis
+vtune -collect microarchitecture -knob enable-stack-collection=true ./program
+
+# Advanced: Intel PEBS (Precise Event-Based Sampling)
+perf record -e mem_load_retired.l3_miss:pp -c 1000 ./program</pre>
+
+    <div class="benchmark">
+        <strong>Matrix multiply optimization stages</strong><br>
+        Naive implementation: <strong>2.1s</strong> (IPC: 0.8, 45% branch misses)<br>
+        Dependency optimization: <strong>1.3s</strong> (IPC: 1.9, 12% branch misses)<br>  
+        Cache blocking: <strong>0.8s</strong> (IPC: 2.1, 3% L3 misses)<br>
+        SIMD + prefetch: <strong>0.4s</strong> (IPC: 3.2, 1% L3 misses)<br>
+        Understanding microarchitecture guides optimization strategy.
+    </div>
+
+    <h2>Architecture-Specific Differences</h2>
+    <p>Intel vs AMD vs ARM characteristics:</p>
+
+    <pre>Intel Core (Skylake family):
+- 6-wide decode, 8-wide rename, 10 execution ports
+- 224 reservation station entries total
+- Strong branch predictor, large BTB
+- AVX-512 support (server parts)
+- Aggressive speculative execution
+
+AMD Zen 3:
+- 6-wide decode, 6-wide rename, 10 execution ports  
+- 72 reservation station entries
+- Excellent branch predictor
+- AVX2 (256-bit), no AVX-512
+- More conservative speculation
+
+ARM Cortex-A78:
+- 6-wide decode, 15 execution units
+- 128-bit NEON SIMD
+- Aggressive out-of-order execution
+- Power-efficient design
+- Scalable Vector Extension (SVE) in newer cores</pre>
+
+    <h2>Bottom Line</h2>
+    <p>Modern CPUs are incredibly complex machines. Pipeline depth affects branch costs. Superscalar width determines peak IPC. Register renaming eliminates false dependencies. Out-of-order execution hides latencies. Branch prediction makes or breaks performance. Understanding these mechanics guides optimization decisions—profile hardware counters, not just wall-clock time.</p>
+
+    <p><a href="../index.html">← Back</a></p>
+</body>
+</html>
