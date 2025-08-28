@@ -1,0 +1,333 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Branch Prediction and Control Flow</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .benchmark {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>Branch Prediction and Control Flow</h1>
+    <div class="meta">2025-07-28 • ~5 min read</div>
+    
+    <p>CPUs hate uncertainty. When they hit a branch, they guess which way it goes and start executing speculatively. Guess wrong? Pipeline flush. 15-20 cycles down the drain.</p>
+
+    <h2>The Problem</h2>
+    <p>Modern processors are pipelined. They start working on instruction N+5 before instruction N finishes. Branches break this flow—CPU doesn't know what comes next until the condition is evaluated.</p>
+
+    <p>Solution: predict. CPU keeps history of recent branches and bets on the pattern. Works great—until it doesn't.</p>
+
+    <h2>Predictable vs Unpredictable</h2>
+    <pre>// Predictable - always taken
+for (int i = 0; i < n; i++) {
+    // loop branch taken n-1 times, not taken once
+}
+
+// Predictable - strong pattern  
+if (likely_true_condition()) {
+    // taken 95% of the time
+}
+
+// Unpredictable - random
+if (data[i] % 2 == 0) {
+    // 50/50 chance, no pattern
+}</pre>
+
+    <div class="benchmark">
+        <strong>Sorting benchmark (1M random ints)</strong><br>
+        Sorted array: <strong>180ms</strong><br>
+        Random array: <strong>1340ms</strong><br>
+        Same algorithm. Only difference: branch predictability.
+    </div>
+
+    <h2>Branch Elimination</h2>
+    <p>Best branch is no branch. Replace conditionals with arithmetic:</p>
+
+    <pre>// Branch-heavy
+int max = a;
+if (b > a) max = b;
+
+// Branch-free  
+int max = a + ((b - a) & ((b - a) >> 31));
+
+// Or use builtin
+int max = (a > b) ? a : b;  // compiler optimizes to cmov</pre>
+
+    <h2>Conditional Moves</h2>
+    <p>Modern CPUs have conditional move instructions. No branch, no prediction needed:</p>
+
+    <pre>// This gets optimized to cmov
+result = condition ? value_a : value_b;
+
+// This forces a branch
+if (condition) {
+    result = value_a;
+    do_something_else();
+} else {
+    result = value_b;
+}</pre>
+
+    <h2>Loop Unrolling</h2>
+    <p>Reduce branch frequency by processing multiple elements per iteration:</p>
+
+    <pre>// High branch overhead
+for (int i = 0; i < n; i++) {
+    process(data[i]);
+}
+
+// Unrolled - fewer branches
+for (int i = 0; i < n; i += 4) {
+    process(data[i]);
+    process(data[i+1]); 
+    process(data[i+2]);
+    process(data[i+3]);
+}
+// handle remainder separately</pre>
+
+    <h2>Likely/Unlikely Hints</h2>
+    <p>Help the compiler and CPU predict better:</p>
+
+    <pre>// GCC/Clang
+if (__builtin_expect(error_condition, 0)) {
+    handle_error();  // cold path
+}
+
+// C++20
+if (condition) [[likely]] {
+    fast_path();
+}
+if (error) [[unlikely]] {
+    slow_path();
+}</pre>
+
+    <h2>Data Structure Layout</h2>
+    <p>Organize data to make branches more predictable:</p>
+
+    <pre>// Bad - random access pattern
+struct Mixed {
+    int type;  // 0, 1, or 2 randomly
+    int data;
+};
+for (auto& item : mixed_array) {
+    if (item.type == 0) process_type_0(item);
+    else if (item.type == 1) process_type_1(item);  
+    else process_type_2(item);
+}
+
+// Good - group by type  
+for (auto& item : type_0_array) process_type_0(item);
+for (auto& item : type_1_array) process_type_1(item);
+for (auto& item : type_2_array) process_type_2(item);</pre>
+
+    <h2>Lookup Tables</h2>
+    <p>Replace complex branching logic with precomputed arrays:</p>
+
+    <pre>// Branch-heavy
+int days_in_month(int month, int year) {
+    if (month == 2) {
+        if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0))
+            return 29;
+        return 28;
+    }
+    if (month == 4 || month == 6 || month == 9 || month == 11)
+        return 30;
+    return 31;
+}
+
+// Lookup table - no branches
+static const int days[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+int days_in_month_fast(int month, int year) {
+    int d = days[month - 1];
+    return d + (month == 2 && is_leap_year(year));
+}</pre>
+
+    <h2>Bit Manipulation Tricks</h2>
+    <p>Use bit operations to avoid conditionals:</p>
+
+    <pre>// Check if power of 2
+bool is_power_of_2(int x) {
+    return x && !(x & (x - 1));
+}
+
+// Count set bits (population count)
+int popcount(uint32_t x) {
+    x = x - ((x >> 1) & 0x55555555);
+    x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+    return (((x + (x >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
+}
+
+// Branchless swap
+void swap_if_greater(int& a, int& b) {
+    int diff = (a > b) ? (a - b) : 0;
+    a -= diff;
+    b += diff;
+}</pre>
+
+    <h2>SIMD Masking</h2>
+    <p>Use vector masks instead of scalar branches:</p>
+
+    <pre>// Scalar - branches for each element
+for (int i = 0; i < n; i++) {
+    if (data[i] > threshold) {
+        result[i] = data[i] * 2;
+    } else {
+        result[i] = data[i];
+    }
+}
+
+// SIMD - no branches, process 8 at once
+__m256i threshold_vec = _mm256_set1_epi32(threshold);
+for (int i = 0; i < n; i += 8) {
+    __m256i data_vec = _mm256_load_si256(&data[i]);
+    __m256i mask = _mm256_cmpgt_epi32(data_vec, threshold_vec);
+    __m256i doubled = _mm256_slli_epi32(data_vec, 1);
+    __m256i result_vec = _mm256_blendv_epi8(data_vec, doubled, mask);
+    _mm256_store_si256(&result[i], result_vec);
+}</pre>
+
+    <h2>Predication</h2>
+    <p>Execute both paths, select result based on condition:</p>
+
+    <pre>// Instead of if-else
+int safe_divide(int a, int b) {
+    int result_div = a / b;       // compute both
+    int result_zero = 0;          // possible outcomes
+    return b != 0 ? result_div : result_zero;  // select
+}
+
+// Predicated operations
+void clamp_array(float* data, int n, float min_val, float max_val) {
+    for (int i = 0; i < n; i++) {
+        float val = data[i];
+        val = (val < min_val) ? min_val : val;  // predicated
+        val = (val > max_val) ? max_val : val;  // moves
+        data[i] = val;
+    }
+}</pre>
+
+    <h2>Index-Based Selection</h2>
+    <p>Convert booleans to array indices:</p>
+
+    <pre>// Character classification without branches
+static const bool is_digit_lut[256] = {
+    // 0-47: false, 48-57: true (ASCII '0'-'9'), 58-255: false
+    [48] = true, [49] = true, [50] = true, [51] = true,
+    [52] = true, [53] = true, [54] = true, [55] = true,
+    [56] = true, [57] = true
+};
+
+bool is_digit(char c) {
+    return is_digit_lut[(unsigned char)c];
+}
+
+// State machines with lookup tables
+enum State { IDLE, READING, DONE };
+static const State transitions[3][2] = {
+    // [state][input]: next_state
+    {READING, IDLE},    // IDLE: input0->READING, input1->IDLE
+    {DONE, READING},    // READING: input0->DONE, input1->READING  
+    {IDLE, IDLE}        // DONE: any->IDLE
+};
+
+State next_state(State current, int input) {
+    return transitions[current][input & 1];
+}</pre>
+
+    <h2>Profile Branch Misses</h2>
+    <p>Measure what matters:</p>
+
+    <pre># Linux - perf
+perf stat -e branch-misses,branches ./program
+
+# Visual Studio
+# Debug → Performance Profiler → CPU Usage
+# Look for functions with high "Exclusive CPU"
+
+# Intel VTune  
+vtune -collect hotspots -knob sampling-mode=hw ./program</pre>
+
+    <h2>Real-World Example</h2>
+    <p>Binary search optimization:</p>
+
+    <pre>// Traditional binary search - unpredictable branches
+int binary_search(int* arr, int n, int target) {
+    int left = 0, right = n - 1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (arr[mid] == target) return mid;
+        if (arr[mid] < target) left = mid + 1;
+        else right = mid - 1;
+    }
+    return -1;
+}
+
+// Branchless version
+int branchless_search(int* arr, int n, int target) {
+    int pos = 0;
+    for (int step = n; step > 0; step /= 2) {
+        int new_pos = pos + step;
+        if (new_pos < n && arr[new_pos] <= target) {
+            pos = new_pos;
+        }
+    }
+    return arr[pos] == target ? pos : -1;
+}</pre>
+
+    <p>The branchless version is 1.42× faster.</p>
+
+    <h2>When Not to Optimize</h2>
+    <p>Branch prediction isn't always the bottleneck:</p>
+
+    <p>• If branches are 95%+ predictable, leave them alone</p>
+    <p>• Memory-bound code doesn't care about branches</p> 
+    <p>• Branchless code can be slower on small datasets</p>
+
+    <h2>Bottom Line</h2>
+    <p>Modern branch predictors are smart. They learn patterns, adapt to loops, even handle simple correlations. But they're not magic. Random branches kill performance. Profile first, optimize second, measure always.</p>
+
+    <p><a href="../index.html">← Back</a></p>
+</body>
+</html>
