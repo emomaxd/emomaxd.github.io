@@ -1,0 +1,204 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Low-Level SMP Boot and Multicore Execution in x86</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .diagram {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>Low-Level SMP Boot and Multicore Execution in x86</h1>
+    <div class="meta">2025-09-24 • ~15 min read</div>
+    
+    <p>x86 SMP enables multicore execution via APIC for interrupts and core coordination. BSP boots first, wakes APs with IPIs. Low-level: MSRs, registers, assembly trampolines, run queues for threading.</p>
+
+    <h2>BSP and Hardware Boot Process</h2>
+    <p>BSP (Bootstrap Processor) is hardware-designated (usually core 0) at power-on. BIOS/UEFI from EEPROM initializes BSP, loads bootloader (e.g., GRUB), which loads kernel. BSP's APIC ID fixed via CPUID (EAX=1, EBX bits 24-31).</p>
+
+    <pre>; BSP detection via CPUID
+mov eax, 1
+cpuid
+shr ebx, 24  ; APIC ID in EBX[31:24]
+; BSP if ID matches hardware default (often 0)</pre>
+
+    <h2>APIC Initialization</h2>
+    <p>Enable Local APIC on BSP via MSR IA32_APIC_BASE (0x1B). Base address 0xFEE00000 (cluster mode) or relocatable. Set bit 11 (enable) and bit 8 (BSP flag, read-only).</p>
+
+    <pre>; Enable APIC (assembly)
+mov ecx, 0x1B     ; IA32_APIC_BASE MSR
+rdmsr             ; Read MSR to EAX:EDX
+or eax, (1 &lt;&lt; 11) ; Set enable bit
+wrmsr             ; Write back
+
+; APIC registers (memory-mapped)
+mov edi, 0xFEE00000  ; APIC base
+mov dword [edi + 0xF0], 0x1FF  ; Spurious vector 0xFF, enable APIC (bit 8)</pre>
+
+    <h2>MP Tables vs ACPI</h2>
+    <p>Legacy MP tables (signature "_MP_") in EBDA/BIOS ROM/base memory provide CPU/IO APIC info. ACPI MADT lists LAPICs. Search MP floating pointer: aligned 16-byte, checksum to 0.</p>
+
+    <pre>; Search MP table (pseudocode)
+for addr in [0x9FC00, 0xE0000-0xFFFFF, etc.]:
+    if *(uint32_t*)addr == 0x5F504D5F:  ; "_MP_"
+        // Parse configuration table at *(uint32_t*)(addr+4)</pre>
+
+    <h2>INIT-SIPI Sequence</h2>
+    <p>BSP sends INIT IPI to reset APs, then SIPI (Startup IPI) with vector (real-mode start address / 4096). Use ICR (0x300/0x310). Poll delivery status (bit 12). Send two SIPIs if needed.</p>
+
+    <pre>; Send INIT IPI (assembly)
+mov dword [APIC_BASE + 0x310], (target_id &lt;&lt; 24)  ; Target APIC ID
+mov dword [APIC_BASE + 0x300], 0x000C4500         ; INIT, all excluding self
+
+; Delay ~10ms
+
+; Send SIPI
+mov dword [APIC_BASE + 0x300], 0x000C4600 | (vector &amp; 0xFF)  ; SIPI, vector=0x08 for 0x8000
+
+; Poll delivery
+loop:
+    mov eax, [APIC_BASE + 0x300]
+    test eax, (1 &lt;&lt; 12)
+    jnz loop</pre>
+
+    <h2>AP Startup and Trampoline Code</h2>
+    <p>APs start in real mode at SIPI vector (e.g., 0x8000). Trampoline: CLI, load GDT, enable protected mode (CR0 bit 0), jump to 32/64-bit code. Set per-AP stack (e.g., APIC_ID * 32K).</p>
+
+    <pre>; Trampoline at 0x8000 (real mode)
+cli
+cld
+jmp 0x8040  ; Far jump
+
+; GDT at 0x8010: null, code (0x08), data (0x10)
+dw 0xFFFF, 0x0000, 0x9A00, 0x00CF  ; Code segment
+
+; LGDT
+lgdt [0x8030]
+
+; Protected mode
+mov eax, cr0
+or al, 1
+mov cr0, eax
+jmp 0x08:protected_entry
+
+protected_entry:
+mov ax, 0x10
+mov ds, ax
+mov ss, ax
+; Get APIC ID
+mov eax, 1
+cpuid
+shr ebx, 24
+shl ebx, 15  ; Stack offset
+mov esp, stack_top
+sub esp, ebx
+call ap_init  ; Kernel AP entry</pre>
+
+    <h2>Scheduler and Run Queues</h2>
+    <p>Per-core run queues (struct rq) hold tasks. Scheduler (e.g., CFS in kernel/sched/core.c) assigns tasks via load balancing. Task struct: code RIP, stack, regs.</p>
+
+    <pre>// Linux run queue (C)
+struct rq {
+    struct cfs_rq cfs;  // Fair scheduler queue
+    // ...
+};
+
+void sched_assign(struct task_struct *task, int cpu) {
+    // Add to per_cpu(runqueues, cpu)
+}</pre>
+
+    <h2>IPI for Thread Distribution</h2>
+    <p>Scheduler sends reschedule IPI (vector e.g., 0x40) to target core via smp.c. Triggers context switch from run queue.</p>
+
+    <pre>// IPI send (C)
+void smp_send_reschedule(int cpu) {
+    apic->send_IPI_mask(cpumask_of(cpu), RESCHEDULE_VECTOR);
+}</pre>
+
+    <h2>Context Switching</h2>
+    <p>Save/restore regs (PUSHALL, POPALL), switch stacks/RIP. Low-level in entry_64.S.</p>
+
+    <pre>; Context switch (assembly)
+switch_to:
+    push rbp
+    // Save old task regs
+    mov [old_task + TS_RSP], rsp
+    mov rsp, [new_task + TS_RSP]
+    // Restore new
+    pop rbp
+    ret</pre>
+
+    <h2>Synchronization and Pitfalls</h2>
+    <p>Use spinlocks (LOCK prefix) for shared data. Pitfalls: APIC delivery failures (poll bit 12), timing (udelay), spurious interrupts (handle via 0xF0).</p>
+
+    <pre>; Spinlock
+lock:
+    lock bts [lock_var], 0
+    jc lock  ; Spin if set</pre>
+
+    <div class="diagram">
+        <strong>SMP Boot Flowchart</strong><br>
+        Power On → BSP Init (MSR 0x1B) → Parse MP/ACPI → Send INIT IPI → Delay → Send SIPI → AP Trampoline → Protected Mode → AP Kernel Entry → Scheduler Assigns Tasks → IPI for Reschedule → Context Switch.
+    </div>
+
+    <h2>Execution Patterns</h2>
+    <p>Patterns in multicore:</p>
+
+    <pre>// Boot: BSP-centric, serial
+// Runtime: Parallel, per-core queues
+// IPIs: For TLB flush, reschedule
+// x2APIC: MSR-based (0x800+), no memory map</pre>
+
+    <h2>Bottom Line</h2>
+    <p>SMP boot: BSP enables APIC via MSR, parses tables, sends INIT-SIPI via ICR. APs trampoline to kernel. Runtime: Scheduler distributes via run queues, IPIs trigger switches. Low-level: Registers 0xFEE00000+, MSRs, assembly for mode switches.</p>
+    
+    <h2>Further Reading</h2>
+    <a href="https://wiki.osdev.org/Multiprocessor_Scheduling">OSDev Wiki</a>
+    <a href="https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html">x86 Manuals</a>
+
+    <p><a href="../index.html">← Back</a></p>
+
+</body>
+</html>

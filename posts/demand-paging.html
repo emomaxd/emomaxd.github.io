@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Low-Level Memory Allocation and Demand Paging in Kernel</title>
+    <style>
+        body {
+            font-family: monospace;
+            margin: 40px auto;
+            max-width: 800px;
+            line-height: 1.4;
+            background: #fafafa;
+            color: #222;
+        }
+        h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        a {
+            color: #000;
+        }
+        .meta {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            overflow-x: auto;
+            font-size: 12px;
+            border-left: 3px solid #ddd;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 4px;
+            font-size: 11px;
+        }
+        .diagram {
+            background: #f8f8f8;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 3px solid #999;
+        }
+    </style>
+</head>
+<body>
+    <h1>Low-Level Memory Allocation and Demand Paging in Kernel</h1>
+    <div class="meta">2025-09-24 • ~12 min read</div>
+    
+    <p>Kernel memory allocation uses virtual mapping initially; physical allocation defers to page faults via demand paging. Buddy allocator handles physical pages on fault. Enables overcommitment and efficiency.</p>
+
+    <h2>Virtual vs Physical Allocation</h2>
+    <p>User-space malloc (via brk/mmap) allocates virtual address space. Kernel maps pages in PTEs as invalid or reserved. No physical RAM until access triggers #PF (page fault).</p>
+
+    <pre>// User malloc
+void* ptr = malloc(4096);  // Virtual alloc, no physical yet
+*ptr = 42;                 // Triggers page fault, then physical alloc</pre>
+
+    <h2>Demand Paging Mechanism</h2>
+    <p>On access, CPU raises #PF (interrupt 14). Kernel handler (e.g., do_page_fault) checks VMA (vm_area_struct), allocates physical page if valid, updates PTE. Lazy allocation saves resources.</p>
+
+    <pre>; Page fault handler (assembly snippet)
+page_fault:
+    push %rax  ; Save regs
+    mov %cr2, %rdi  ; Fault address in CR2
+    call do_page_fault
+    pop %rax
+    iretq</pre>
+
+    <h2>Buddy Allocator Role</h2>
+    <p>Physical allocator (buddy system in mm/page_alloc.c) splits/merges power-of-2 blocks. On fault, kernel calls __alloc_pages (get_free_pages) from free_area lists. Zones: DMA, Normal, Highmem.</p>
+
+    <pre>// Kernel physical alloc (C)
+struct page *page = alloc_pages(GFP_KERNEL, 0);  // Order 0: single page
+unsigned long phys_addr = page_to_pfn(page) &lt;&lt; PAGE_SHIFT;</pre>
+
+    <h2>Page Table Updates</h2>
+    <p>After alloc, kernel sets PTE (page table entry) with physical frame number (PFN), flags (present, writable). x86: 4-level paging (PML4, PDPT, PD, PT). Use pgd/p4d/pud/pmd/pte macros.</p>
+
+    <pre>// Set PTE (C)
+pte_t *pte = pte_offset_map(pmd, addr);
+set_pte_at(mm, addr, pte, pte_mkyoung(pte_mkdirty(mk_pte(page, prot))));</pre>
+
+    <h2>Overcommitment and OOM</h2>
+    <p>Lazy alloc allows overcommit (more virtual than physical). If RAM exhausts on fault, OOM killer (out_of_memory) selects/kills process. Sysctl vm.overcommit_memory tunes behavior.</p>
+
+    <pre># Tune overcommit
+echo 1 &gt; /proc/sys/vm/overcommit_memory  // Allow overcommit</pre>
+
+    <h2>Copy-on-Write (COW)</h2>
+    <p>Related: Fork uses COW. Shared pages marked read-only; write fault allocates new physical page, copies data. Optimizes memory usage.</p>
+
+    <pre>// Fork COW fault
+if (write &amp;&amp; pte_dirty(pte) &amp;&amp; !pte_write(pte)) {
+    // Handle COW: alloc new page, copy, update PTE
+}</pre>
+
+    <h2>Zero Page Optimization</h2>
+    <p>For anonymous pages, kernel maps read-only zero page initially. Write fault replaces with new zeroed physical page. Saves init time.</p>
+
+    <pre>// Zero page (global)
+struct page *empty_zero_page;</pre>
+
+    <h2>Swap and Major/Minor Faults</h2>
+    <p>Minor fault: Page in memory but not mapped. Major: Disk/swap load. Buddy alloc for swap-in. vm_ops->fault for file-backed.</p>
+
+    <pre>// Fault types
+if (vmf->flags &amp; FAULT_FLAG_MAJOR) {
+    // Disk I/O for page
+}</pre>
+
+    <div class="diagram">
+        <strong>Demand Paging Flowchart</strong><br>
+        Malloc → Virtual VMA Create → Access → #PF (CR2=addr) → Handler Checks Valid → Alloc Physical (Buddy) → Map PTE (PFN + Flags) → Resume. Invalid → SIGSEGV.
+    </div>
+
+    <h2>Kernel Files and Structures</h2>
+    <p>Key files: mm/memory.c (do_page_fault), mm/page_alloc.c (buddy), arch/x86/mm/fault.c. Structs: vm_area_struct (VMA), mm_struct (process memory), page (physical page).</p>
+
+    <pre>// VMA struct (C)
+struct vm_area_struct {
+    unsigned long vm_start, vm_end;
+    struct mm_struct *vm_mm;
+    // ...
+};</pre>
+
+    <h2>Bottom Line</h2>
+    <p>Kernel defers physical allocation to page faults for efficiency. Virtual alloc immediate (malloc/mmap), physical via buddy on access. Enables overcommit, COW, zero-page opts. Low-level: #PF handler, PTE updates, CR2 register.</p>
+
+    <p><a href="../index.html">← Back</a></p>
+</body>
+</html>
