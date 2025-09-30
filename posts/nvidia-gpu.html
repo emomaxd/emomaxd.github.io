@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Understanding Streaming Multiprocessors in NVIDIA GPUs</title>
+<style>
+body { font-family: monospace; margin: 40px auto; max-width: 800px; line-height: 1.4; background: #fafafa; color: #222; }
+h1 { font-size: 18px; margin-bottom: 5px; }
+h2 { font-size: 16px; margin: 20px 0 10px 0; border-bottom: 1px solid #ccc; }
+a { color: #000; }
+.meta { color: #666; font-size: 12px; margin-bottom: 20px; }
+pre { background: #f0f0f0; padding: 10px; overflow-x: auto; font-size: 12px; border-left: 3px solid #ddd; }
+code { background: #f0f0f0; padding: 2px 4px; font-size: 11px; }
+.diagram { background: #f8f8f8; padding: 15px; margin: 15px 0; border-left: 3px solid #999; }
+</style>
+</head>
+<body>
+<h1>Understanding Streaming Multiprocessors in NVIDIA GPUs</h1>
+<div class="meta">2025-09-30 • ~15 min read</div>
+<p>Streaming Multiprocessors (SMs) in NVIDIA GPUs act like the cores in CPUs, handling computations and holding state in registers with caches nearby. But unlike beefy CPU cores, SMs keep things simple and straightforward—no fancy speculation or branch prediction here. Instead, they shine by juggling tons of threads at once, making them perfect for parallel workloads.</p>
+<h2>What Are SMs?</h2>
+<p>Think of SMs as the workhorses inside your NVIDIA GPU. They're pipelined for instructions, much like CPUs have been since the '90s, but without the bells and whistles of speculative execution or predicting where the code jumps next. What they lack in smarts, they make up for in sheer numbers and speed at handling parallelism.</p>
+<h2>Warps and Schedulers</h2>
+<p>A warp is basically a squad of 32 threads that all run the same instruction at the same time—it's the GPU's fundamental scheduling unit. Warp schedulers keep things humming by swapping between these warps every clock cycle, ensuring the compute units stay busy and latencies from memory or instructions get hidden away.</p>
+<h2>Comparing to CPUs</h2>
+<p>Let's put this in perspective. An AMD EPYC 9965 CPU tops out at 500W with 192 cores, each juggling up to two threads, for a max of 384 threads in parallel at about 1.25W per thread. Flip to an H100 SXM GPU: 700W, 132 SMs, each with four warp schedulers issuing to 32 threads per cycle. That's 128 threads per SM times 132 SMs, hitting 16,896 parallel threads at roughly 5cW each. And yeah, it's real parallelism—every thread advances per cycle.</p>
+<p>A single SM on the H100 can manage up to 2048 concurrent threads, divided into 64 warps. Across all SMs, that's over 250,000 threads running at once. CPUs handle multiple threads too, but GPU warp switches are lightning-fast—every clock cycle, over 1000 times quicker than CPU context switches. This quick pivoting, courtesy of the SM's warp schedulers, masks delays from memory or sync ops, keeping CUDA and Tensor cores cranking.</p>
+<p>For kicks, consider a modest PC CPU at 2.6GHz with 6 cores: that's 15.6 billion clock cycles per second total. GPUs scale that parallelism way up.</p>
+<h2>Inside the SM: Units at Work</h2>
+<p>Beyond CUDA and Tensor cores, SMs pack Special Function Units (SFUs) for tricky math like sine, cosine, reciprocals, and transcendentals. These offload the heavy lifting so main cores don't bog down. Load/Store Units (LSUs) shuffle data between registers, shared memory, and global memory. The smooth interplay between CUDA cores, SFUs, and LSUs lets SMs juggle thousands of threads without grinding to a halt on data moves or complex ops.</p>
+<p>Together, these form the GPU's powerhouse, striking a balance between crunching numbers and moving bits to fuel efficient parallel execution.</p>
+<h2>Launching a CUDA Kernel</h2>
+<p>When you kick off a CUDA kernel, it's not like calling a C++ function. You're handing over a blueprint for parallelism, often in PTX intermediate form, to the NVIDIA driver. The driver acts as a just-in-time compiler, turning PTX into SASS—the GPU's native assembly. This isn't a hint to the compiler; it's configuring the GPU hardware directly. The CPU bows out after describing the job.</p>
+<p>The GPU's Gigathread Engine, its global scheduler, doesn't peek at your loops or logic. It sees the grid of thread blocks you defined as a work queue and assigns them to available SMs. This load balancing is pure hardware magic, out of your or the compiler's hands.</p>
+<h2>Thread Blocks and Resource Allocation</h2>
+<p>Once a thread block hits an SM, it's stuck there until done—resources get physically locked in. Take a simple line like <code>float my_val = data[idx];</code>—that's claiming a spot in the SM's 256KB register file. Pile on variables like <code>float r1, r2, r3;</code>, and your register footprint balloons, limiting how many threads fit on the SM.</p>
+<p>The compiler tweaks register use, but can't expand the hardware's limits. High register demands mean fewer threads, hurting the GPU's latency-hiding strategy: oversubscription.</p>
+<h2>Latency Hiding and Oversubscription</h2>
+<p>Against memory delays, GPUs don't predict—they oversubscribe. When a warp hits a slow op like <code>val = global_mem[idx];</code>, a scoreboard (a bitmask tracking dependencies) flags the register as pending. The warp scheduler spots the stall and flips to another ready warp next cycle. No software overhead—just zero-cost hardware switching.</p>
+<p>High occupancy from low register use gives the scheduler plenty of warps to pick from, keeping things humming.</p>
+<h2>Execution Pipelines and ILP</h2>
+<p>SMs are a bundle of specialized pipelines. A warp's instruction, say <code>c = a + b;</code>, routes to the right unit: INT32 ALUs for integers, FP32 CUDA cores for floats. In one cycle, the SM might handle an int op for warp 7, a load for warp 3, and a multiply for warp 12. That's instruction-level parallelism on top of your thread-level setup. The compiler plans it, hardware runs it.</p>
+<h2>Memory Access Patterns</h2>
+<p>Here's where your code meets hardware reality. For <code>global_mem[base_index + threadIdx.x]</code>, the LSU collects 32 addresses and minimizes 128-byte cache line fetches. Sequential? Probably one or two lines—perfect coalescing, super efficient.</p>
+<p>But <code>global_mem[base_index + threadIdx.x * 32]</code>? Scattered addresses mean tons of separate transactions, slowing everything. The compiler can't reorder without breaking logic, per the "as-if" rule.</p>
+<h2>Shared Memory and Bank Conflicts</h2>
+<p>Shared memory is dedicated SRAM with 32 banks. Bank = address % 32. If threads hit different banks like <code>shared_data[threadIdx.x]</code>, it's full-speed parallel access. But all targeting <code>shared_data[10]</code>? Bank 10 gets slammed, serializing 32 requests via the crossbar—32x slowdown from bank conflicts. Your layout dictates performance; compiler can't save you.</p>
+<h2>Control Flow Divergence</h2>
+<p>Divergence hits hard in the parallel world. For <code>if (threadIdx.x < 16)</code>, hardware checks all 32 threads. If split, it serializes: runs the if path with an active mask disabling non-qualifiers, then the else with the mask flipped. You pay the time for both paths sequentially. No CPU-like branch reordering here—hardware just follows orders.</p>
+<div class="diagram">
+<strong>GPU Execution Flow</strong><br>
+Kernel Launch → PTX to SASS (Driver) → Gigathread Engine Queues Blocks → Assign to SMs → Allocate Registers → Warp Scheduling → Pipeline Dispatch (CUDA/SFUs/LSUs) → Memory Access (Coalescing/Banks) → Handle Divergence with Masks.
+</div>
+<h2>Compiler vs. Hardware Limits</h2>
+<p>The NVIDIA driver, like any compiler, optimizes within GPU bounds: unrolls loops, schedules instructions, manages registers. But it's tied to the "as-if" rule and can't invent new algorithms. It won't fix divergent code, swap SoA to AoS for coalescing, or resolve bank conflicts. Big wins come from aligning your intent with hardware—avoid divergent algos, bad data layouts, or fighting the memory controller.</p>
+<h2>Bottom Line</h2>
+<p>SMs drive NVIDIA GPUs with massive parallelism via warps, schedulers, and units like SFUs/LSUs. Kernel launches hand off to hardware for block assignment and execution, hiding latency through oversubscription. Key pitfalls: high register footprints, poor coalescing, bank conflicts, divergence. Optimize by matching code to hardware design, not micro-tweaks.</p>
+<h2>Further Reading</h2>
+<a href="https://developer.nvidia.com/cuda-toolkit-documentation">NVIDIA CUDA Docs</a> <a href="https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html">CUDA Programming Guide</a>
+<p><a href="../index.html">← Back</a></p>
+</body>
+</html>
