@@ -1,0 +1,204 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>How do graphics drivers work? - Emre Cecanpunar</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 40px auto;
+            max-width: 850px;
+            line-height: 1.7;
+            background: #fafafa;
+            color: #333;
+            padding: 0 30px;
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        .date {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            font-size: 24px;
+            margin: 40px 0 15px 0;
+            color: #1a1a1a;
+        }
+        h3 {
+            font-size: 20px;
+            margin: 30px 0 10px 0;
+            color: #1a1a1a;
+        }
+        p {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        ul {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>How do graphics drivers work?</h1>
+    <div class="date">Dec 15, 2025</div>
+
+    <p>
+        Graphics drivers are one of the most complex pieces of software running on your computer, but most people don't really understand how they work. 
+        I want to give an overview of what a graphics driver actually does and how the different components fit together.
+    </p>
+
+    <h2>What is a graphics driver?</h2>
+
+    <p>
+        A graphics driver is software that lets your applications talk to your GPU. Every GPU is different—different capabilities, different instruction sets, 
+        different ways of doing things. So they need different drivers, or at least different code paths for different hardware generations.
+    </p>
+
+    <p>
+        The main job of a graphics driver is to let applications use your GPU efficiently. This means games can render frames, scientific applications can 
+        run compute workloads, and video software can encode/decode streams without hammering your CPU.
+    </p>
+
+    <h2>Driver architecture</h2>
+
+    <p>
+        Graphics drivers are more complicated than most other hardware drivers because the functionality is incredibly broad and hardware varies a lot 
+        between vendors and generations. Here's how a typical graphics driver stack is organized:
+    </p>
+
+    <ul>
+        <li><strong>GPU firmware (FW)</strong> — Low-level code running on the GPU itself, handling power management, context switching, command processing, 
+        display engine, video encode/decode, etc.</li>
+        <li><strong>Kernel driver (KMD)</strong> — Sits in the kernel, handles memory management, command submission from multiple processes, 
+        and display functionality.</li>
+        <li><strong>Userspace driver (UMD)</strong> — Implements graphics APIs like Vulkan, OpenGL, Direct3D. This is where most of the driver 
+        logic actually lives.</li>
+        <li><strong>Shader compiler</strong> — Translates shader code (GLSL, SPIR-V, HLSL) into GPU-specific machine code. Sometimes shared between 
+        multiple drivers, sometimes a separate project.</li>
+    </ul>
+
+    <h3>Why the split between kernel and userspace?</h3>
+
+    <p>
+        You might wonder why we don't just put everything in the kernel. The answer is simple: you don't want your kernel to crash when a game does 
+        something stupid. You also don't want a full compiler running in kernel space, taking arbitrary user input and generating code. And you definitely 
+        don't want to reboot your system every time there's a driver update.
+    </p>
+
+    <p>
+        So the kernel driver (KMD) only handles the bare minimum that absolutely needs kernel privileges:
+    </p>
+
+    <ul>
+        <li>Command submission API for userspace</li>
+        <li>Memory management (VRAM allocation, paging, etc.)</li>
+        <li>Display controller programming</li>
+        <li>Power management coordination</li>
+        <li>GPU recovery when things go wrong</li>
+    </ul>
+
+    <p>
+        Everything else—API implementation, shader compilation, command buffer recording—happens in userspace where it's safe to crash without 
+        taking down your whole system.
+    </p>
+
+    <h2>GPU firmware</h2>
+
+    <p>
+        Most modern GPUs have separate processors (not the shader cores) running firmware that handles low-level hardware operations. This firmware 
+        parses commands you submit, launches shaders, distributes work across shader cores, manages power states, and coordinates the display engine.
+    </p>
+
+    <p>
+        GPU vendors are moving more functionality into firmware over time. This reduces CPU overhead (fewer driver calls needed) but also makes the 
+        hardware less transparent—you can't see what the firmware is doing, you just trust it to do the right thing.
+    </p>
+
+    <h2>Shader compilation</h2>
+
+    <p>
+        If you've ever seen "Compiling shaders..." on a loading screen and wondered why that's necessary: unlike CPUs which have mostly standardized on 
+        a few instruction sets (x86-64, ARM), every GPU has its own instruction set architecture (ISA). Even different generations from the same vendor 
+        have different ISAs.
+    </p>
+
+    <p>
+        This means shaders have to be compiled on your machine, at runtime, specifically for your GPU. The shader compiler takes high-level shader code 
+        (or bytecode like SPIR-V) and generates the actual machine instructions your GPU's shader cores will execute.
+    </p>
+
+    <p>
+        Shader compilers are complex—they need to do instruction scheduling, register allocation, optimization passes, all while respecting the 
+        specific constraints and capabilities of your GPU architecture. This is where a lot of the performance tuning happens.
+    </p>
+
+    <h2>On Windows vs Linux</h2>
+
+    <p>
+        On Windows, GPU vendors package everything together in one installer: firmware, kernel driver, userspace drivers for all APIs, shader compilers, 
+        a control panel application, and various utilities. Users download "the driver" and that's it.
+    </p>
+
+    <p>
+        On Linux, the graphics stack is more transparent but also more fragmented. The kernel driver is part of the kernel tree, firmware files are in 
+        <code>linux-firmware</code>, userspace drivers are in Mesa, and shader compilers might be part of Mesa or separate projects like LLVM. 
+        Different distros package these differently, which can lead to confusion.
+    </p>
+
+    <p>
+        This doesn't mean Linux drivers are worse—it just means they're organized differently because they're developed by a community rather than 
+        a single vendor's internal team.
+    </p>
+
+    <h2>What I learned from embedded systems</h2>
+
+    <p>
+        Working on embedded systems gave me a different perspective on drivers. When you're doing board bring-up on something like the TI AM67A, 
+        you realize how many layers of abstraction we take for granted in desktop graphics.
+    </p>
+
+    <p>
+        In embedded, you write device tree files to describe hardware connections, configure pinmux for every GPIO, manually set up MMU page tables, 
+        and initialize DDR controllers with timing parameters from datasheets. There's no "it just works"—if the UART doesn't print anything, 
+        you might be looking at the wrong register offset or forgot to enable a clock tree somewhere.
+    </p>
+
+    <p>
+        Graphics drivers operate at a higher level, but the same principles apply: understand the hardware, read the docs (if they exist), and don't 
+        assume the abstraction layers are doing what you think they're doing.
+    </p>
+
+    <div class="back">
+        <a href="../index.html">← Back to main page</a>
+    </div>
+
+</body>
+</html>

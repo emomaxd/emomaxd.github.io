@@ -1,0 +1,217 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Emre Cecanpunar</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 40px auto;
+            max-width: 850px;
+            line-height: 1.6;
+            background: #fafafa;
+            color: #333;
+            padding: 0 30px;
+        }
+        .header {
+            margin-bottom: 40px;
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        .intro-text {
+            font-size: 16px;
+            color: #444;
+            margin-bottom: 25px;
+            line-height: 1.7;
+        }
+        .about-section {
+            margin-bottom: 50px;
+        }
+        .about-section p {
+            font-size: 15px;
+            color: #555;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+        h2 {
+            font-size: 22px;
+            margin: 40px 0 20px 0;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .section-intro {
+            font-size: 15px;
+            color: #555;
+            margin-bottom: 20px;
+            line-height: 1.7;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            margin-bottom: 15px;
+            font-size: 15px;
+            color: #555;
+        }
+        li strong {
+            color: #333;
+        }
+        .post {
+            margin-bottom: 25px;
+        }
+        .post-title {
+            font-size: 16px;
+            color: #0066cc;
+        }
+        .post-date {
+            color: #999;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        .post-desc {
+            color: #666;
+            font-size: 14px;
+            margin: 5px 0 0 0;
+            line-height: 1.6;
+        }
+        .contact {
+            color: #777;
+            font-size: 14px;
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Emre Cecanpunar</h1>
+        <p class="intro-text">
+            I'm a developer who works on low-level graphics and systems code. I currently contribute to the Linux open source graphics stack.
+        </p>
+    </div>
+
+    <div class="about-section">
+        <p>
+            I care about performance, hardware understanding, and code that actually does something useful. Not interested in enterprise abstractions 
+            or "best practices" that ignore how hardware works. If something can be faster, it should be faster.
+        </p>
+        <p>
+            These days I enjoy working on GPU compilers and graphics drivers, which is much more interesting than most of the corporate software 
+            I've seen. Previously worked on embedded systems at Baykar on the T3 Gemstone project (Turkey's first open-source SBC)—doing low-level 
+            board bring-up, porting RTOSes, the kind of work where you read datasheets and count instruction cycles.
+        </p>
+    </div>
+
+    <h2>Current work</h2>
+    <p class="section-intro">
+        I'm currently contributing to these parts of the Mesa project:
+    </p>
+    <ul>
+        <li><strong>ACO</strong> — a shader compiler backend for AMD RDNA GPUs</li>
+        <li><strong>RADV</strong> — a Vulkan driver for AMD Radeon GPUs</li>
+        <li><strong>NIR</strong> — the common compiler infrastructure used by most Mesa drivers</li>
+    </ul>
+    <p class="section-intro">
+        Also studying the Linux kernel DRM subsystem and contributing patches when I can.
+    </p>
+
+    <h2>Previous work</h2>
+    <p class="section-intro">
+        Here are some of the more interesting things I've worked on over the past few years.
+    </p>
+    <ul>
+        <li>
+            <strong>Baykar (T3 Gemstone)</strong> — Turkey's first open-source single-board computer. 
+            I was responsible for TI AM67A SoC bring-up, porting NuttX RTOS, implementing low-level initialization 
+            (DDR, MMU, cache), device drivers, and device tree configuration.
+        </li>
+        <li>
+            <strong>Atmaca Roket Takımı</strong> — Developed software for rocket avionics, including microcontroller 
+            integration, LoRa communication, and parachute deployment algorithms with Kalman filtering. 
+            Received a 100% grade from TÜBİTAK on the avionics report.
+        </li>
+    </ul>
+
+    <h2>Blog posts</h2>
+    <p class="section-intro">
+        I'm documenting my journey learning Mesa internals to build a standalone ACO compiler tool. 
+        Each post covers a piece of the puzzle I need to understand to make it work.
+    </p>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/spirv-to-aco-pipeline.html">SPIR-V to ACO compilation pipeline</a></span><span class="post-date">TODO</span>
+        <p class="post-desc">How Mesa compiles shaders from SPIR-V bytecode to ACO assembly—parsing SPIR-V, converting to NIR, 
+        NIR optimization passes, lowering to ACO IR, and final code generation. Understanding the full pipeline to build a standalone compiler.</p>
+    </div>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/nir-role-mesa.html">What NIR does in Mesa</a></span><span class="post-date">TODO</span>
+        <p class="post-desc">NIR as the common intermediate representation in Mesa—why it exists, what optimizations happen at NIR level, 
+        how different drivers share code through NIR, and why you can't skip it when compiling shaders.</p>
+    </div>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/radv-aco-interface.html">How RADV prepares data for ACO</a></span><span class="post-date">TODO</span>
+        <p class="post-desc">Understanding the RADV-ACO interface—what structures RADV fills, shader info, pipeline configuration, 
+        hardware capabilities. What I need to replicate in a standalone tool without RADV's context.</p>
+    </div>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/shader-binary-to-gpu.html">How shader binaries reach the GPU</a></span><span class="post-date">TODO</span>
+        <p class="post-desc">From compiled shader to GPU execution—pipeline objects, shader upload, command buffer encoding, 
+        DRM ioctl interface, and what actually happens when you call vkCreateGraphicsPipelines.</p>
+    </div>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/aco-ir-structure.html">ACO intermediate representation structure</a></span><span class="post-date">TODO</span>
+        <p class="post-desc">Understanding ACO's IR—instruction formats, basic blocks, SSA form, register allocation constraints, 
+        and how to read ACO assembly dumps. Essential for debugging compiler output.</p>
+    </div>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/rdna-hardware-model.html">RDNA hardware model for compiler writers</a></span><span class="post-date">TODO</span>
+        <p class="post-desc">What ACO needs to know about RDNA hardware—wavefronts, VGPR/SGPR architecture, instruction latencies, 
+        execution masks, and hardware constraints that affect code generation.</p>
+    </div>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/aco-standalone-tool.html">Building the ACO standalone tool</a></span><span class="post-date">TODO</span>
+        <p class="post-desc">Putting it all together—decoupling ACO from RADV dependencies, implementing the CLI interface, 
+        handling hardware configuration, and making a usable standalone shader compiler.</p>
+    </div>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/getting-started-mesa.html">Getting started with Mesa</a></span><span class="post-date">Jan 13, 2026</span>
+        <p class="post-desc">What I've learned while getting started with Mesa contribution—understanding the codebase, debugging tools, and making your first patches.</p>
+    </div>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/linux-graphics-stack.html">Understanding the Linux graphics stack</a></span><span class="post-date">Jan 6, 2026</span>
+        <p class="post-desc">Overview of how the Linux graphics stack works, what Mesa does, and why keeping your drivers up to date matters for performance.</p>
+    </div>
+
+    <div class="post">
+        <span class="post-title"><a href="posts/how-graphics-drivers-work.html">How do graphics drivers work?</a></span><span class="post-date">Dec 29, 2025</span>
+        <p class="post-desc">An overview of graphics driver architecture—firmware, kernel drivers, userspace drivers, shader compilers, and how they fit together.</p>
+    </div>
+
+    <div class="contact">
+        You can find me on OFTC IRC server as <strong>emomaxd</strong>(also everywhere), 
+        or by email at emreleno (at) gmail (dot) com.
+    </div>
+
+</body>
+</html>
