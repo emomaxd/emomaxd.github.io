@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Minimal Linux: 900KB kernel, no glibc - Emre Cecanpunar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 40px auto;
+            max-width: 850px;
+            line-height: 1.7;
+            background: #fafafa;
+            color: #333;
+            padding: 0 30px;
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        .date {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            font-size: 24px;
+            margin: 40px 0 15px 0;
+            color: #1a1a1a;
+        }
+        p {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 15px;
+            overflow-x: auto;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Minimal Linux: 900KB kernel, no glibc</h1>
+    <div class="date">Mar 20, 2026</div>
+
+    <p>
+        I wanted to see how small a bootable Linux system can be. Not Alpine-minimal. Actually minimal.
+        Result: ~900KB kernel, a shell in x86-64 assembly using raw syscalls, under 9MB RAM, boots in under a second.
+    </p>
+
+    <h2>The kernel</h2>
+
+    <p>
+        <code>make tinyconfig</code> gets you a kernel smaller than <code>allnoconfig</code>.
+        No networking, no loadable modules, no SMP. The bzImage came out around 900KB.
+        A distro kernel is 10-15MB compressed.
+    </p>
+
+    <p>
+        I added serial console, initramfs, and <code>CONFIG_PRINTK</code> on top of tinyconfig.
+        Debugging without printk is miserable. Each option I turned on, the binary grew.
+        Good way to see what each config option costs in bytes.
+    </p>
+
+    <h2>Shell in assembly</h2>
+
+    <p>
+        BusyBox is the standard answer for minimal userspace. I skipped it initially and wrote
+        a shell directly in x86-64 assembly. No glibc, no musl, no libc. Direct syscalls.
+    </p>
+
+    <pre>; write(1, msg, len)
+mov rax, 1
+mov rdi, 1
+mov rsi, msg
+mov rdx, msg_len
+syscall
+
+; read(0, buf, 256)
+xor eax, eax
+xor edi, edi
+mov rsi, buf
+mov edx, 256
+syscall</pre>
+
+    <p>
+        It handles <code>echo</code>, <code>ls</code> (via <code>getdents64</code>),
+        <code>cat</code> (via <code>open</code>/<code>read</code>/<code>write</code>),
+        and <code>exec</code> (via <code>execve</code>). Not POSIX. Enough to poke around.
+    </p>
+
+    <p>
+        The annoying parts: <code>getdents64</code> returns variable-length records, so you
+        walk the buffer manually. <code>execve</code> needs a null-terminated argv array.
+        Small things libc does for you that you don't think about until they're gone.
+    </p>
+
+    <h2>Adding real software</h2>
+
+    <p>
+        After the assembly shell worked, I added BusyBox (static, musl) and Lua.
+        BusyBox is ~1MB for a real shell plus coreutils. Lua builds with no dependencies.
+    </p>
+
+    <p>
+        Full system — kernel, initramfs, BusyBox, Lua, assembly shell — under 9MB RAM.
+        Boots in under a second on QEMU. No systemd, no init system. Kernel loads initramfs,
+        runs <code>/init</code>, you get a prompt.
+    </p>
+
+    <h2>What I took away</h2>
+
+    <p>
+        The kernel itself is small and fast. The weight in a typical Linux system comes
+        from everything above it. Useful to see that directly rather than just assume it.
+    </p>
+
+    <div class="back">
+        <a href="../index.html">← Back to main page</a>
+    </div>
+
+</body>
+</html>

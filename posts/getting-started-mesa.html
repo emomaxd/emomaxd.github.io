@@ -1,7 +1,8 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Getting started with Mesa - Emre Cecanpunar</title>
     <style>
         body {
@@ -26,11 +27,6 @@
         h2 {
             font-size: 24px;
             margin: 40px 0 15px 0;
-            color: #1a1a1a;
-        }
-        h3 {
-            font-size: 20px;
-            margin: 30px 0 10px 0;
             color: #1a1a1a;
         }
         p {
@@ -75,48 +71,34 @@
 </head>
 <body>
     <h1>Getting started with Mesa</h1>
-    <div class="date">Jan 8, 2026</div>
+    <div class="date">Jan 13, 2026</div>
 
     <p>
-        Mesa is intimidating at first—it's a huge codebase with multiple drivers, compiler infrastructure, and decades of history. But it's also 
-        well-organized once you understand the structure. Here's what I've learned while getting started with Mesa contribution.
+        Notes from my first weeks reading and building Mesa. Mostly for myself, but maybe useful
+        if you're in the same position.
     </p>
 
-    <h2>Understanding the codebase</h2>
+    <h2>The source tree</h2>
 
     <p>
-        Mesa's source tree is organized by driver and component. The main directories you'll care about:
+        AMD-specific code lives under <code>src/amd/</code>. RADV is in
+        <code>src/amd/vulkan/</code>, ACO in <code>src/amd/compiler/</code>.
+        NIR (Mesa's shared compiler IR) is in <code>src/compiler/nir/</code>.
+        Everything else can wait.
     </p>
 
-    <ul>
-        <li><code>src/amd/</code> — AMD-specific code (RADV, RadeonSI, ACO compiler)</li>
-        <li><code>src/intel/</code> — Intel drivers and compiler</li>
-        <li><code>src/compiler/nir/</code> — NIR intermediate representation</li>
-        <li><code>src/vulkan/</code> — Common Vulkan code shared between drivers</li>
-        <li><code>src/gallium/</code> — Gallium driver infrastructure</li>
-    </ul>
-
-    <p>
-        If you're working on AMD Vulkan (RADV), you'll spend most of your time in <code>src/amd/vulkan/</code> for the driver code and 
-        <code>src/amd/compiler/</code> for ACO.
-    </p>
-
-    <h2>Building Mesa</h2>
-
-    <p>
-        Mesa uses Meson as its build system. Basic build:
-    </p>
+    <h2>Building</h2>
 
     <pre>meson setup build -Dvulkan-drivers=amd -Dgallium-drivers= -Dbuildtype=debug
 ninja -C build</pre>
 
     <p>
-        The <code>-Dvulkan-drivers=amd</code> builds only RADV (faster than building everything). Debug builds include symbols and assertions which 
-        are essential when you're learning the code.
+        Skip Gallium if you're only working on RADV/ACO. Debug builds are slower but you
+        get assertions, which catch bugs early.
     </p>
 
     <p>
-        To use your custom Mesa build without installing it system-wide, set these environment variables:
+        To use your build without installing system-wide:
     </p>
 
     <pre>export VK_ICD_FILENAMES=/path/to/build/src/amd/vulkan/radeon_icd.x86_64.json
@@ -125,124 +107,51 @@ export LD_LIBRARY_PATH=/path/to/build/src/amd/vulkan:$LD_LIBRARY_PATH</pre>
     <h2>Reading the code</h2>
 
     <p>
-        Start by tracing a simple API call. For example, in RADV:
+        I traced <code>vkCreateGraphicsPipelines</code> end to end.
+        <code>radv_pipeline.c</code> → <code>radv_shader.c</code> → <code>aco_interface.cpp</code> →
+        instruction selection, register allocation, scheduling → binary embedded in the pipeline object.
+        Following one call path teaches you more than reading docs.
     </p>
 
+    <h2>Debug env vars</h2>
+
     <ul>
-        <li><code>vkCreateGraphicsPipelines</code> is in <code>radv_pipeline.c</code></li>
-        <li>This calls into shader compilation in <code>radv_shader.c</code></li>
-        <li>Which eventually calls ACO in <code>aco_interface.cpp</code></li>
-        <li>ACO does instruction selection, optimization, register allocation</li>
-        <li>Final binary is embedded in the pipeline object</li>
+        <li><code>RADV_DEBUG=shaders</code> — dumps shader assembly</li>
+        <li><code>RADV_DEBUG=checkir</code> — validates NIR after each pass</li>
+        <li><code>ACO_DEBUG=validateir</code> — validates ACO IR</li>
+        <li><code>NIR_PRINT=1</code> — prints NIR before compilation</li>
     </ul>
 
     <p>
-        Following the code path for one operation teaches you how the pieces fit together. Use <code>grep</code> and <code>cscope</code> liberally.
+        When something breaks, diff the shader dumps before and after your change.
+        Usually tells you exactly what happened.
     </p>
 
-    <h2>Debugging tools</h2>
+    <h2>First contribution</h2>
 
     <p>
-        Mesa has extensive debugging infrastructure via environment variables:
-    </p>
-
-    <ul>
-        <li><code>RADV_DEBUG=shaders</code> — Dumps shader assembly</li>
-        <li><code>RADV_DEBUG=checkir</code> — Validates NIR after each pass</li>
-        <li><code>ACO_DEBUG=validateir</code> — Validates ACO IR</li>
-        <li><code>NIR_PRINT=1</code> — Prints NIR before compilation</li>
-    </ul>
-
-    <p>
-        These are invaluable for understanding what the compiler is doing. When something breaks, comparing the shader dumps before and after your 
-        change tells you exactly what went wrong.
-    </p>
-
-    <h3>RenderDoc for graphics debugging</h3>
-
-    <p>
-        RenderDoc is essential for debugging graphics issues. It captures a frame, shows you every draw call, lets you inspect pipeline state, 
-        shader inputs/outputs, and even debug shaders step-by-step.
+        My first kernel patch removed unused code that generated warnings.
+        Trivial, but it taught me the patch submission workflow and how maintainer review works.
     </p>
 
     <p>
-        When a game renders incorrectly, RenderDoc shows you which draw call is wrong, what shaders are running, what textures are bound, etc. 
-        Much faster than print debugging.
+        For Mesa: make changes, <code>meson test</code>, format commit message (match existing style),
+        push to GitLab, open MR, wait for CI and review. Maintainers will ask for changes.
     </p>
 
-    <h2>Making your first contribution</h2>
+    <h2>Community</h2>
 
     <p>
-        Start small. Look for:
+        IRC on OFTC. <code>#dri-devel</code> for general Mesa, <code>#radeon</code> for AMD.
     </p>
 
-    <ul>
-        <li>Compiler warnings in the build output</li>
-        <li>TODOs in the code</li>
-        <li>Issues tagged "good first issue" on GitLab</li>
-        <li>Documentation improvements</li>
-    </ul>
+    <h2>What I'm working on</h2>
 
     <p>
-        My first kernel patch was fixing old unused code that generated warnings. Trivial fix, but it taught me the patch submission workflow and 
-        how to respond to maintainer feedback.
-    </p>
-
-    <p>
-        For Mesa, the process is:
-    </p>
-
-    <ul>
-        <li>Make your changes</li>
-        <li>Run <code>meson test</code> to verify you didn't break anything</li>
-        <li>Format your commit message properly (check existing commits for style)</li>
-        <li>Push to GitLab and create a merge request</li>
-        <li>Wait for CI and reviewer feedback</li>
-    </ul>
-
-    <p>
-        Be prepared for feedback. Maintainers will ask you to change things, restructure commits, or explain your reasoning. This is normal and 
-        how you learn to write better code.
-    </p>
-
-    <h2>Community interaction</h2>
-
-    <p>
-        Join the Matrix channels:
-    </p>
-
-    <ul>
-        <li><code>#radv:matrix.org</code> — RADV development</li>
-        <li><code>#dri-devel:matrix.org</code> — General Mesa development</li>
-        <li><code>#nir:matrix.org</code> — Compiler discussions</li>
-    </ul>
-
-    <p>
-        Don't be afraid to ask questions. The community is helpful as long as you've done your homework first (read the code, tried debugging, 
-        searched the issue tracker).
-    </p>
-
-    <h2>What I'm learning</h2>
-
-    <p>
-        I'm currently studying ACO's register allocator and instruction scheduler. The code is cleaner than I expected—good variable names, 
-        reasonable comments, clear structure.
-    </p>
-
-    <p>
-        What's interesting is seeing compiler theory applied to real hardware constraints. Textbook compiler courses teach you register allocation 
-        as graph coloring, but ACO has to deal with:
-    </p>
-
-    <ul>
-        <li>Multiple register files (VGPR vs SGPR on AMD)</li>
-        <li>Variable register sizes (wave32 vs wave64 mode)</li>
-        <li>Latency hiding through high register usage</li>
-        <li>Spilling to scratch memory when you run out</li>
-    </ul>
-
-    <p>
-        The gap between theory and practice is where interesting problems live.
+        ACO internals — instruction selection, register allocator, instruction scheduler.
+        Textbook register allocation is graph coloring. ACO deals with VGPR vs SGPR,
+        wave32/wave64, latency hiding through occupancy, spilling to scratch memory.
+        The hardware constraints make it more interesting than the theory.
     </p>
 
     <div class="back">

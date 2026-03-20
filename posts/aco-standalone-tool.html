@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>aco_dump: compiling shaders without a GPU - Emre Cecanpunar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 40px auto;
+            max-width: 850px;
+            line-height: 1.7;
+            background: #fafafa;
+            color: #333;
+            padding: 0 30px;
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        .date {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            font-size: 24px;
+            margin: 40px 0 15px 0;
+            color: #1a1a1a;
+        }
+        p {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 15px;
+            overflow-x: auto;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>aco_dump: compiling shaders without a GPU</h1>
+    <div class="date">Mar 20, 2026</div>
+
+    <p>
+        I wrote a tool called <code>aco_dump</code>. It takes a SPIR-V binary, runs it through
+        the RADV/ACO pipeline, and dumps the ACO IR. No GPU needed. It runs on the noop drm-shim device.
+    </p>
+
+    <p>
+        I proposed it upstream. The discussion is on
+        <a href="https://gitlab.freedesktop.org/mesa/mesa/-/issues/15111">issue #15111</a>.
+    </p>
+
+    <h2>The problem</h2>
+
+    <p>
+        Normally, to see what ACO does to a shader, you need an AMD GPU and a running Vulkan app.
+        Capture a frame, extract shaders, set <code>RADV_DEBUG=shaders</code>, look at the dump.
+        Slow. Limited to whatever app you can run.
+    </p>
+
+    <p>
+        I wanted: give it a .spv file, get ACO IR out. For any gfx level. From any machine.
+    </p>
+
+    <h2>How it works</h2>
+
+    <p>
+        Two pieces make this possible: <strong>drm-shim</strong> and <strong>PipelineBuilder</strong>.
+    </p>
+
+    <p>
+        drm-shim is a library that intercepts DRM ioctls and fakes a GPU. RADV asks "what hardware is this?",
+        drm-shim answers with whatever gfx level you picked. Mesa initializes normally. It just can't submit
+        work — which doesn't matter, I only want the compiler output.
+    </p>
+
+    <p>
+        PipelineBuilder is Mesa's internal test utility. It constructs Vulkan pipeline objects
+        programmatically, without the full API surface. I used this instead of fossilize because
+        I need direct control over pipeline state, not replay of pre-recorded captures.
+    </p>
+
+    <h2>Usage</h2>
+
+    <pre>ninja -C build src/amd/compiler/tests/aco_dump</pre>
+
+    <p>
+        Compute shader:
+    </p>
+
+    <pre>LD_PRELOAD=build/src/amd/drm-shim/libamdgpu_noop_drm_shim.so \
+  build/src/amd/compiler/tests/aco_dump gfx9 cs compute.spv</pre>
+
+    <p>
+        Vertex + fragment pipeline:
+    </p>
+
+    <pre>LD_PRELOAD=build/src/amd/drm-shim/libamdgpu_noop_drm_shim.so \
+  build/src/amd/compiler/tests/aco_dump gfx10 vsfs vert.spv frag.spv</pre>
+
+    <p>
+        Supports gfx6 through gfx12. Two modes: <code>cs</code> for compute, <code>vsfs</code> for
+        vertex+fragment. The gfx level is the first argument, so comparing output across generations
+        is just changing one word.
+    </p>
+
+    <h2>The upstream discussion</h2>
+
+    <p>
+        The main pushback was maintenance. Anything that depends on RADV internals breaks when those
+        internals change, and they change often. The tool lives under <code>src/amd/compiler/tests/</code>
+        to stay close to the existing test infrastructure and minimize coupling.
+    </p>
+
+    <h2>What I got out of it</h2>
+
+    <p>
+        Building this meant understanding every piece of state that flows from RADV into ACO.
+        Hardware caps, shader stage info, pipeline layout, binding models — inside ACO, all of this
+        is already there. When you're setting it up yourself, you learn what each field actually means.
+    </p>
+
+    <p>
+        The other useful thing: comparing the same shader across gfx levels. Same SPIR-V, different
+        instruction encodings, different register pressure, different scheduling. Side by side,
+        no hardware swap needed.
+    </p>
+
+    <div class="back">
+        <a href="../index.html">← Back to main page</a>
+    </div>
+
+</body>
+</html>

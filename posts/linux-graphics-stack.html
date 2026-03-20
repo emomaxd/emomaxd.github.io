@@ -1,8 +1,9 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Understanding the Linux graphics stack - Emre Cecanpunar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Linux graphics stack - Emre Cecanpunar</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -26,11 +27,6 @@
         h2 {
             font-size: 24px;
             margin: 40px 0 15px 0;
-            color: #1a1a1a;
-        }
-        h3 {
-            font-size: 20px;
-            margin: 30px 0 10px 0;
             color: #1a1a1a;
         }
         p {
@@ -67,132 +63,77 @@
     </style>
 </head>
 <body>
-    <h1>Understanding the Linux graphics stack</h1>
-    <div class="date">Dec 21, 2025</div>
+    <h1>The Linux graphics stack</h1>
+    <div class="date">Jan 6, 2026</div>
 
     <p>
-        After explaining how graphics drivers work in general, I want to talk specifically about the Linux graphics stack. What are the important 
-        projects, how do they fit together, and what you actually need to make your GPU work properly.
+        When I started working on Mesa I needed to know what all the moving parts were.
+        This is the map I built.
     </p>
 
-    <h2>The components you need</h2>
+    <h2>What you actually need</h2>
 
     <p>
-        To get your GPU working on Linux with open source drivers, you need these pieces:
-    </p>
-
-    <ul>
-        <li><strong>Linux kernel</strong> — Contains the kernel drivers (KMD) for your GPU in the DRM subsystem</li>
-        <li><strong>linux-firmware</strong> — Firmware files the GPU needs to function. Even with open source drivers, the firmware itself is usually proprietary</li>
-        <li><strong>Mesa</strong> — The main userspace graphics stack, implementing Vulkan, OpenGL, and other APIs</li>
-        <li><strong>LLVM</strong> — Used by some Mesa drivers for shader compilation</li>
-    </ul>
-
-    <p>
-        All of these need to support your specific GPU. More importantly, they need to be recent versions. Using old packages means missing out on 
-        new features, bug fixes, and performance improvements.
-    </p>
-
-    <h2>The "drivers are in the kernel" myth</h2>
-
-    <p>
-        You'll see people on Reddit saying "the drivers are in the kernel" on Linux. This is only partially true. The <em>kernel</em> driver is in 
-        the kernel, but that's just one piece. The userspace drivers (Mesa), shader compilers, and firmware are all separate packages.
-    </p>
-
-    <p>
-        Your distro manages how these are packaged and which versions you get. This is why graphics experience can vary so much between different 
-        distributions.
-    </p>
-
-    <h2>What is Mesa?</h2>
-
-    <p>
-        Mesa is the cornerstone of the open source graphics stack on Linux. It's a collection of userspace drivers implementing various graphics 
-        and compute APIs for different GPUs.
-    </p>
-
-    <h3>Mesa's main components</h3>
-
-    <p>
-        <strong>Gallium drivers</strong> implement OpenGL, OpenGL ES, OpenCL, and video APIs (VAAPI). Gallium is a common infrastructure that lets 
-        drivers share code for these APIs.
-    </p>
-
-    <p>
-        <strong>Vulkan drivers</strong> are separate from Gallium because Vulkan is lower-level than the abstraction Gallium provides. But Vulkan 
-        drivers still share significant code with their Gallium counterparts where it makes sense.
-    </p>
-
-    <p>
-        <strong>NIR</strong> (the "common compiler infrastructure") is at the heart of modern Mesa drivers. It's an intermediate representation (IR) 
-        that lets different drivers share optimization passes and compiler infrastructure. Instead of every driver implementing the same optimizations 
-        for their specific GPU, they can use shared NIR passes and only write the backend code generation.
-    </p>
-
-    <h2>AMD graphics on Linux</h2>
-
-    <p>
-        For AMD GPUs specifically, the stack looks like this:
+        Four separate things, all of which need to support your GPU:
     </p>
 
     <ul>
-        <li><strong>amdgpu</strong> — Kernel driver in the DRM subsystem</li>
-        <li><strong>RADV</strong> — Mesa's Vulkan driver for AMD (what I'm currently working on)</li>
-        <li><strong>RadeonSI</strong> — Mesa's OpenGL driver for AMD</li>
-        <li><strong>ACO</strong> — AMD's shader compiler backend, used by RADV</li>
-        <li><strong>LLVM</strong> — Alternative shader compiler backend, used by RadeonSI and optionally by RADV</li>
+        <li><strong>Linux kernel</strong> — the KMD lives in the DRM subsystem</li>
+        <li><strong>linux-firmware</strong> — GPU firmware, usually proprietary even with open source drivers</li>
+        <li><strong>Mesa</strong> — userspace drivers (Vulkan, OpenGL, etc.)</li>
+        <li><strong>LLVM</strong> — used by some Mesa drivers for shader compilation</li>
     </ul>
 
     <p>
-        ACO is interesting because it was developed specifically for RADV to address performance issues with LLVM shader compilation. It's a 
-        from-scratch compiler backend that generates better code faster than LLVM for graphics workloads.
+        "The drivers are in the kernel" is only true for the KMD. Mesa, firmware, and shader compilers
+        are separate packages your distro manages independently.
     </p>
 
-    <h2>Why old packages hurt performance</h2>
+    <h2>Mesa</h2>
 
     <p>
-        Some distros (Debian, Ubuntu LTS, etc.) ship old kernel and Mesa versions claiming they're more "stable." This is backwards. Driver developers 
-        actively work on fixing bugs and adding features. New games rely on new driver features. Old drivers mean worse performance and more bugs, 
-        not fewer.
-    </p>
-
-    <p>
-        Mesa development moves fast. Every release has performance improvements, bug fixes, and new features. If you're running Mesa from 6 months ago, 
-        you're missing hundreds of commits worth of improvements.
+        Mesa has two main driver families: Gallium (OpenGL, OpenCL, video) and Vulkan drivers.
+        They're separate because Vulkan is lower-level than the abstraction Gallium provides.
     </p>
 
     <p>
-        The kernel DRM subsystem is the same—active development means fixes and new features land constantly. Regressions happen, but they get fixed 
-        quickly because of extensive automated testing (the Vulkan conformance test suite runs on every commit to Mesa, for example).
+        NIR is the shared IR across Mesa drivers. Optimization passes written for NIR benefit
+        every driver that uses it. Most modern Mesa drivers do.
     </p>
 
-    <h2>For gaming: use Proton</h2>
+    <h2>AMD on Linux</h2>
+
+    <ul>
+        <li><strong>amdgpu</strong> — kernel driver</li>
+        <li><strong>RADV</strong> — Vulkan driver</li>
+        <li><strong>RadeonSI</strong> — OpenGL driver</li>
+        <li><strong>ACO</strong> — shader compiler backend, used by RADV</li>
+        <li><strong>LLVM</strong> — alternative backend, used by RadeonSI</li>
+    </ul>
 
     <p>
-        If you want to run Windows games on Linux, use Proton (built into Steam) or Wine with DXVK/VKD3D-Proton. These translate DirectX to Vulkan 
-        and offer the best performance and compatibility.
+        ACO was written specifically for RADV because LLVM's compile times and code quality
+        weren't good enough for interactive use. It's a full compiler backend written from scratch,
+        and for graphics workloads it beats LLVM on both speed and output quality.
     </p>
 
+    <h2>Keep your stack current</h2>
+
     <p>
-        Avoid Wine's default WineD3D (which translates DirectX to OpenGL)—it's slower and less compatible than the Vulkan-based translation layers.
+        Mesa and the kernel DRM subsystem move fast. New hardware support, bug fixes,
+        and performance work land constantly. Running packages from 6 months ago means
+        missing a lot of that. Distros that ship old Mesa in the name of "stability"
+        are getting that tradeoff backwards — old drivers have more bugs, not fewer.
     </p>
 
-    <h2>My perspective from Mesa work</h2>
+    <h2>From the ACO side</h2>
 
     <p>
-        I'm currently studying ACO, RADV, and NIR. The code is surprisingly readable once you understand the basic architecture. NIR especially is 
-        well-designed—having a common IR means you can implement an optimization once and every driver benefits.
-    </p>
-
-    <p>
-        What's interesting is seeing how much work goes into generating efficient GPU code. Register allocation alone is a complex problem because 
-        GPUs have specific constraints—you want high register usage for hiding latency, but too much causes spilling which kills performance.
-    </p>
-
-    <p>
-        Instruction scheduling matters more on GPUs than CPUs because latencies are longer and there's less out-of-order execution to hide stalls. 
-        ACO does a lot of work to schedule instructions properly and keep the GPU busy.
+        Working on ACO makes the stack concrete. Register allocation has to account for
+        occupancy — more live registers means fewer concurrent wavefronts, which reduces
+        the GPU's ability to hide memory latency. Instruction scheduling has to keep
+        execution units fed despite long latencies. These constraints don't exist in
+        CPU compilers at the same scale.
     </p>
 
     <div class="back">
