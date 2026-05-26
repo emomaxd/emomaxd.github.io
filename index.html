@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Emre Cecanpunar — systems programmer working on GPU compilers, Linux kernel, and performance."
+      content="Emre Cecanpunar — linux graphics hacker"
     />
     <title>Emre Cecanpunar</title>
     <style>
@@ -104,30 +104,38 @@
     <div class="header">
       <h1>Emre Cecanpunar</h1>
       <p class="intro-text">
-        Systems programmer. Compilers, kernels, and making things go fast on
-        silicon.
+        Systems programmer. GPU drivers and compilers, and making things go fast on
+        silicon(hopefully).
       </p>
     </div>
 
     <div class="about-section">
       <p>
-        I care about performance and understanding what the hardware actually
-        does. If something can be faster, it should be faster.
-      </p>
-      <p>
-        These days I work on GPU compilers and graphics drivers. Previously did
-        embedded systems at Baykar on the T3 Gemstone project — board bring-up,
-        RTOS porting.
+        These days I work on GPU drivers and compilers. Previously did
+        embedded OS work on the T3 Gemstone project — board bring-up, RTOS porting.
       </p>
     </div>
 
     <h2>Current work</h2>
     <p class="section-intro">
-      Working on <strong>ACO</strong>, the shader compiler backend for AMD GPUs
-      in Mesa. Also reading RADV and NIR code when relevant.
+      Working on the graphics stack according to my current accessible hardware, currently hacking 
+      some stuff on the i915/anv side plus working on panthor/panvk with my orange pi 5. 
+      Previously worked with ACO compiler to try some optimizer patches when I had no amdgpu at the time.
     </p>
 
     <h2>Blog posts</h2>
+    <div class="post">
+      <span class="post-title"
+        ><a href="posts/aco-pack-constant-shift.html"
+          >aco-pack-constant shift: a patch that never fired</a
+        ></span
+      ><span class="post-date">May 2026</span>
+      <p class="post-desc">
+        A month of spare time work on an ACO optimization. shader-db: zero hits.
+        Timur explained why — NIR already handled it upstream.
+      </p>
+    </div>
+
     <div class="post">
       <span class="post-title"
         ><a href="posts/aco-standalone-tool.html"
@@ -142,18 +150,6 @@
 
     <div class="post">
       <span class="post-title"
-        ><a href="posts/minimal-linux-system.html"
-          >Minimal Linux: 900KB kernel, no glibc</a
-        ></span
-      ><span class="post-date">Mar 20, 2026</span>
-      <p class="post-desc">
-        tinyconfig kernel, a shell in x86-64 assembly, direct syscalls. Boots in
-        under a second on under 9MB RAM.
-      </p>
-    </div>
-
-    <div class="post">
-      <span class="post-title"
         ><a href="posts/getting-started-mesa.html"
           >Getting started with Mesa</a
         ></span
@@ -161,18 +157,6 @@
       <p class="post-desc">
         What I learned getting started with Mesa — the codebase, debugging
         tools, and making my first patches.
-      </p>
-    </div>
-
-    <div class="post">
-      <span class="post-title"
-        ><a href="posts/linux-graphics-stack.html"
-          >Understanding the Linux graphics stack</a
-        ></span
-      ><span class="post-date">Jan 6, 2026</span>
-      <p class="post-desc">
-        The map I built when I started working on Mesa — kernel driver, Mesa,
-        firmware, ACO, how they fit together.
       </p>
     </div>
 

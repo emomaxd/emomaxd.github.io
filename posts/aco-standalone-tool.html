@@ -66,43 +66,38 @@
     <div class="date">Mar 20, 2026</div>
 
     <p>
-        I wrote a tool called <code>aco_dump</code>. It takes a SPIR-V binary, runs it through
-        the RADV/ACO pipeline, and dumps the ACO IR. No GPU needed. It runs on the noop drm-shim device.
+        I wrote a tool called <code>aco_dump</code>. You give it a SPIR-V binary and it runs it
+        through the RADV/ACO pipeline and dumps the ACO IR. No GPU needed.
     </p>
 
     <p>
-        I proposed it upstream. The discussion is on
+        I proposed it upstream, the discussion is on
         <a href="https://gitlab.freedesktop.org/mesa/mesa/-/issues/15111">issue #15111</a>.
     </p>
 
     <h2>The problem</h2>
 
     <p>
-        Normally, to see what ACO does to a shader, you need an AMD GPU and a running Vulkan app.
-        Capture a frame, extract shaders, set <code>RADV_DEBUG=shaders</code>, look at the dump.
-        Slow. Limited to whatever app you can run.
+        Normally to see what ACO does to a shader you need an AMD GPU and a running Vulkan app.
+        You set <code>RADV_DEBUG=shaders</code>, capture a frame, extract the shaders and look at the dump.
+        It's a bit annoying especially if you just want to check something quick.
     </p>
 
     <p>
-        I wanted: give it a .spv file, get ACO IR out. For any gfx level. From any machine.
+        I wanted something simpler — just give it a .spv file and get ACO IR out, for any gfx level, without needing actual hardware.
     </p>
 
     <h2>How it works</h2>
 
     <p>
-        Two pieces make this possible: <strong>drm-shim</strong> and <strong>PipelineBuilder</strong>.
+        drm-shim basically fakes a GPU by intercepting the DRM ioctls. RADV asks what hardware
+        it's running on and drm-shim answers with whatever gfx level you set. Mesa initializes fine,
+        it just can't submit work — which doesn't matter since I only care about the compiler output anyway.
     </p>
 
     <p>
-        drm-shim is a library that intercepts DRM ioctls and fakes a GPU. RADV asks "what hardware is this?",
-        drm-shim answers with whatever gfx level you picked. Mesa initializes normally. It just can't submit
-        work — which doesn't matter, I only want the compiler output.
-    </p>
-
-    <p>
-        PipelineBuilder is Mesa's internal test utility. It constructs Vulkan pipeline objects
-        programmatically, without the full API surface. I used this instead of fossilize because
-        I need direct control over pipeline state, not replay of pre-recorded captures.
+        PipelineBuilder is the internal test utility in Mesa. I used it instead of fossilize because
+        I needed direct control over pipeline state, not replaying pre-recorded captures.
     </p>
 
     <h2>Usage</h2>
@@ -125,30 +120,22 @@
 
     <p>
         Supports gfx6 through gfx12. Two modes: <code>cs</code> for compute, <code>vsfs</code> for
-        vertex+fragment. The gfx level is the first argument, so comparing output across generations
-        is just changing one word.
+        vertex+fragment. If you want to compare the same shader on different hardware you just change
+        the gfx argument, that's it.
     </p>
 
     <h2>The upstream discussion</h2>
 
     <p>
-        The main pushback was maintenance. Anything that depends on RADV internals breaks when those
-        internals change, and they change often. The tool lives under <code>src/amd/compiler/tests/</code>
-        to stay close to the existing test infrastructure and minimize coupling.
-    </p>
-
-    <h2>What I got out of it</h2>
-
-    <p>
-        Building this meant understanding every piece of state that flows from RADV into ACO.
-        Hardware caps, shader stage info, pipeline layout, binding models — inside ACO, all of this
-        is already there. When you're setting it up yourself, you learn what each field actually means.
+        The main concern was maintenance. Anything that depends on RADV internals breaks when those
+        internals change, and they change often. So the tool lives under <code>src/amd/compiler/tests/</code>
+        to stay close to the existing test infrastructure.
     </p>
 
     <p>
-        The other useful thing: comparing the same shader across gfx levels. Same SPIR-V, different
-        instruction encodings, different register pressure, different scheduling. Side by side,
-        no hardware swap needed.
+        One useful side effect of doing it this way is that you end up understanding what each field
+        actually means since you have to set everything up manually. And comparing the same shader
+        across different gfx levels is just changing one argument, no hardware swap needed.
     </p>
 
     <div class="back">

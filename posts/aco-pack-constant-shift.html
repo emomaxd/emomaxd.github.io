@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>aco-pack-constant shift: a patch that never fired - Emre Cecanpunar</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 40px auto;
+            max-width: 850px;
+            line-height: 1.7;
+            background: #fafafa;
+            color: #333;
+            padding: 0 30px;
+        }
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: #1a1a1a;
+        }
+        .date {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            font-size: 24px;
+            margin: 40px 0 15px 0;
+            color: #1a1a1a;
+        }
+        p {
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 15px;
+            overflow-x: auto;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>aco-pack-constant shift: a patch that never fired</h1>
+    <div class="date">May 2026</div>
+
+    <p>
+        Spent about a month on this in my spare time. Wrote the patch, wrote the test, ran shader-db — nothing triggered. Here's what happened.
+    </p>
+
+    <h2>How I found it</h2>
+
+    <p>
+        I was looking for some places to patch and I noticed some TODO comments left in <code>aco_optimizer.cpp</code>. So I thought I could pick one of them and try to implement it.
+    </p>
+
+    <h2>The optimization</h2>
+
+    <p>
+        Before GFX11 there was no <code>pack_hl</code> instruction in the ISA. The idea was: if any of the operands are constant, we can shift it and transform the <code>_hl</code> instruction to <code>_ll</code> or <code>_hh</code> depending on the constant's position. That way you can use an instruction that actually exists on older hardware.
+    </p>
+
+    <h2>Implementation</h2>
+
+    <p>
+        The implementation part was not that hard. I referenced the existing implementations and adapted it to my needs, basically just read and copied a few lines from above. After I felt okay about it I wrote a test that triggers that instruction, it was passing and seemed fine to me.
+    </p>
+
+    <h2>shader-db: nothing</h2>
+
+    <p>
+        Then I ran shader-db and none of the shaders triggered my optimization. Not a single one. I re-ran it, checked the conditions again, tried a few more things, but nothing changed.
+    </p>
+
+    <h2>Asking on Discord</h2>
+
+    <p>
+        After some days I reached out to Rhys Perry and Timur Kristoff in a Discord channel and proposed the change to them. Timur basically said ACO tries to handle everything at once, so this pattern was probably already eliminated somewhere earlier in the pipeline — maybe NIR already simplified it before ACO even gets to see the IR.
+    </p>
+
+    <p>
+        That made sense to me, I just didn't think about it at the time. So I dropped it, no MR opened.
+    </p>
+
+    <h2>Why I'm writing this</h2>
+
+    <p>
+        This was the first real thing I worked on in ACO. Didn't go anywhere but still, it was a good way to get into the codebase and I think it was worth writing down.
+    </p>
+
+    <div class="back">
+        <a href="../index.html">← Back to main page</a>
+    </div>
+
+</body>
+</html>

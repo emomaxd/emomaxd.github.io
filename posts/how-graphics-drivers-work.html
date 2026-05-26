@@ -64,35 +64,30 @@
         graphics stack look familiar in some ways and strange in others.
     </p>
 
-    <p>
-        When I started reading Mesa, I needed a mental model for where everything fit.
-    </p>
-
     <h2>The stack</h2>
 
     <p>
-        Three layers, ignoring firmware: kernel driver, userspace driver, shader compiler.
+        There are basically three layers if you ignore firmware: the kernel driver, the userspace driver, and the shader compiler.
     </p>
 
     <p>
-        The <strong>kernel driver</strong> does what only the kernel can do — memory management,
-        command submission from multiple processes, display controller, power, GPU reset when
-        things go wrong. On Linux this lives in the DRM subsystem. For AMD it's <code>amdgpu</code>.
+        The kernel driver handles the stuff that has to be in kernel space — memory management,
+        command submission from multiple processes, display, power, resetting the GPU when it crashes.
+        On Linux this is the DRM subsystem, for AMD it's <code>amdgpu</code>.
     </p>
 
     <p>
-        The <strong>userspace driver</strong> implements the API — Vulkan, OpenGL, whatever.
-        This is where most of the logic lives. For AMD Vulkan it's RADV, which is part of Mesa.
-        It records command buffers, manages pipeline state, uploads resources. When you call
-        <code>vkQueueSubmit</code>, it eventually does an ioctl into the kernel driver to actually
-        submit work.
+        The userspace driver implements the API, Vulkan or OpenGL or whatever. Most of the logic
+        is here. For AMD Vulkan it's RADV which is part of Mesa. It records command buffers, manages
+        pipeline state, uploads resources. When you call <code>vkQueueSubmit</code> it eventually
+        does an ioctl into the kernel driver to actually do the work.
     </p>
 
     <p>
-        The <strong>shader compiler</strong> takes bytecode (SPIR-V for Vulkan) and produces
-        GPU machine code. GPU ISAs aren't standardized — gfx9 and gfx11 are different enough
-        that you can't run the same binary on both. So compilation happens at runtime, on your machine,
-        for your specific GPU. For RADV this is ACO.
+        The shader compiler takes SPIR-V bytecode and produces actual GPU machine code. GPU ISAs
+        aren't standardized so gfx9 and gfx11 are completely different, you can't run the same
+        binary on both. So compilation happens at runtime on your machine for your specific GPU.
+        For RADV this is ACO.
     </p>
 
     <h2>Why shaders are compiled at runtime</h2>
@@ -114,22 +109,16 @@
     <h2>Where ACO fits</h2>
 
     <p>
-        ACO is the compiler backend inside Mesa for AMD GPUs. It takes NIR (Mesa's IR) and
-        produces AMD machine code. It handles instruction selection, register allocation,
-        and scheduling.
+        ACO is the compiler backend in Mesa for AMD GPUs. It gets NIR from RADV and produces
+        the actual machine code that runs on the GPU — instruction selection, register allocation,
+        scheduling, all of that happens here. This is the part I'm currently working on.
     </p>
 
     <p>
-        Register allocation on a GPU is different from CPU. You want more live registers
-        to hide memory latency — the GPU hides a stall by switching to another wavefront.
-        But more registers means fewer concurrent wavefronts, which means less parallelism
-        to hide stalls with. It's a tradeoff the compiler has to balance per shader.
-    </p>
-
-    <p>
-        This is the part of the stack I'm working on. Before getting here I needed to understand
-        everything above it — what RADV passes into ACO, what the kernel expects to receive,
-        how it all connects.
+        Register allocation on GPU is different from CPU. If you have more live registers you
+        can hide memory latency better since the GPU switches to another wavefront when one stalls.
+        But more registers means fewer concurrent wavefronts so less parallelism. The compiler
+        has to find a balance for each shader.
     </p>
 
     <div class="back">

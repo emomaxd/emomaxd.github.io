@@ -84,7 +84,7 @@
         AMD-specific code lives under <code>src/amd/</code>. RADV is in
         <code>src/amd/vulkan/</code>, ACO in <code>src/amd/compiler/</code>.
         NIR (Mesa's shared compiler IR) is in <code>src/compiler/nir/</code>.
-        Everything else can wait.
+        I didn't really need to touch anything else at the start.
     </p>
 
     <h2>Building</h2>
@@ -110,7 +110,7 @@ export LD_LIBRARY_PATH=/path/to/build/src/amd/vulkan:$LD_LIBRARY_PATH</pre>
         I traced <code>vkCreateGraphicsPipelines</code> end to end.
         <code>radv_pipeline.c</code> → <code>radv_shader.c</code> → <code>aco_interface.cpp</code> →
         instruction selection, register allocation, scheduling → binary embedded in the pipeline object.
-        Following one call path teaches you more than reading docs.
+        It's a much better way to understand the codebase than just reading docs honestly.
     </p>
 
     <h2>Debug env vars</h2>
@@ -123,20 +123,19 @@ export LD_LIBRARY_PATH=/path/to/build/src/amd/vulkan:$LD_LIBRARY_PATH</pre>
     </ul>
 
     <p>
-        When something breaks, diff the shader dumps before and after your change.
-        Usually tells you exactly what happened.
+        When something breaks I diff the shader dumps before and after the change, that usually shows what went wrong.
     </p>
 
     <h2>First contribution</h2>
 
     <p>
-        My first kernel patch removed unused code that generated warnings.
-        Trivial, but it taught me the patch submission workflow and how maintainer review works.
+        My first kernel patch was just removing some unused code that was generating warnings.
+        Nothing special but it helped me understand the patch submission process and what review looks like.
     </p>
 
     <p>
         For Mesa: make changes, <code>meson test</code>, format commit message (match existing style),
-        push to GitLab, open MR, wait for CI and review. Maintainers will ask for changes.
+        push to GitLab, open MR, wait for CI and review.
     </p>
 
     <h2>Community</h2>
@@ -148,10 +147,10 @@ export LD_LIBRARY_PATH=/path/to/build/src/amd/vulkan:$LD_LIBRARY_PATH</pre>
     <h2>What I'm working on</h2>
 
     <p>
-        ACO internals — instruction selection, register allocator, instruction scheduler.
-        Textbook register allocation is graph coloring. ACO deals with VGPR vs SGPR,
-        wave32/wave64, latency hiding through occupancy, spilling to scratch memory.
-        The hardware constraints make it more interesting than the theory.
+        I'm looking at ACO internals — instruction selection, register allocator, scheduler stuff.
+        Textbook register allocation is graph coloring but ACO has to deal with VGPR vs SGPR,
+        wave32/wave64, occupancy tradeoffs, spilling to scratch. It's a lot more involved than
+        the theory because of the hardware constraints.
     </p>
 
     <div class="back">
