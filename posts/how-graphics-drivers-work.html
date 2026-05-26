@@ -93,32 +93,16 @@
     <h2>Why shaders are compiled at runtime</h2>
 
     <p>
-        Coming from embedded, this surprised me at first. On a microcontroller you cross-compile
-        once and flash the binary. GPUs don't work that way. Every generation has a different ISA,
-        different register counts, different instruction latencies. Even same-generation cards
-        differ in shader core count, cache sizes, memory bandwidth — all of which affects
-        how a good compiler schedules instructions.
+        On a microcontroller you cross-compile once and flash the binary. GPUs don't work that way.
+        Every generation has a different ISA, different register counts, different instruction latencies.
+        Even same-generation cards differ in shader core count, cache sizes, memory bandwidth — all of
+        which affect how a good compiler schedules instructions.
     </p>
 
     <p>
         SPIR-V (Vulkan's shader bytecode) is the portable format. The driver compiles it on first use.
         That's the "compiling shaders" stutter in new games — the driver is compiling every shader
         the first time it sees it.
-    </p>
-
-    <h2>Where ACO fits</h2>
-
-    <p>
-        ACO is the compiler backend in Mesa for AMD GPUs. It gets NIR from RADV and produces
-        the actual machine code that runs on the GPU — instruction selection, register allocation,
-        scheduling, all of that happens here. This is the part I'm currently working on.
-    </p>
-
-    <p>
-        Register allocation on GPU is different from CPU. If you have more live registers you
-        can hide memory latency better since the GPU switches to another wavefront when one stalls.
-        But more registers means fewer concurrent wavefronts so less parallelism. The compiler
-        has to find a balance for each shader.
     </p>
 
     <div class="back">

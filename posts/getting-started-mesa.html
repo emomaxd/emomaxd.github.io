@@ -144,14 +144,6 @@ export LD_LIBRARY_PATH=/path/to/build/src/amd/vulkan:$LD_LIBRARY_PATH</pre>
         IRC on OFTC. <code>#dri-devel</code> for general Mesa, <code>#radeon</code> for AMD.
     </p>
 
-    <h2>What I'm working on</h2>
-
-    <p>
-        I'm looking at ACO internals — instruction selection, register allocator, scheduler stuff.
-        Textbook register allocation is graph coloring but ACO has to deal with VGPR vs SGPR,
-        wave32/wave64, occupancy tradeoffs, spilling to scratch. It's a lot more involved than
-        the theory because of the hardware constraints.
-    </p>
 
     <div class="back">
         <a href="../index.html">← Back to main page</a>

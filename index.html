@@ -118,9 +118,8 @@
 
     <h2>Current work</h2>
     <p class="section-intro">
-      Working on the graphics stack according to my current accessible hardware, currently hacking 
-      some stuff on the i915/anv side plus working on panthor/panvk with my orange pi 5. 
-      Previously worked with ACO compiler to try some optimizer patches when I had no amdgpu at the time.
+      Hacking on the graphics stack depending on what hardware I have at hand — currently i915/anv
+      and panthor/panvk on an Orange Pi 5. Previously did some ACO optimizer work when I had no AMD GPU.
     </p>
 
     <h2>Blog posts</h2>
@@ -131,8 +130,8 @@
         ></span
       ><span class="post-date">May 2026</span>
       <p class="post-desc">
-        A month of spare time work on an ACO optimization. shader-db: zero hits.
-        Timur explained why — NIR already handled it upstream.
+        Spent a month on an ACO optimizer patch, wrote the test, ran shader-db — not a single hit.
+        Turned out NIR already handled it upstream.
       </p>
     </div>
 
@@ -141,10 +140,9 @@
         ><a href="posts/aco-standalone-tool.html"
           >aco_dump: compiling shaders without a GPU</a
         ></span
-      ><span class="post-date">Mar 20, 2026</span>
+      ><span class="post-date">Mar 2026</span>
       <p class="post-desc">
-        A CLI tool I wrote that runs SPIR-V through RADV/ACO on a fake GPU.
-        PipelineBuilder, drm-shim, and the upstream discussion.
+        A tool I wrote to run SPIR-V through the ACO pipeline without needing actual GPU hardware.
       </p>
     </div>
 
@@ -153,10 +151,9 @@
         ><a href="posts/getting-started-mesa.html"
           >Getting started with Mesa</a
         ></span
-      ><span class="post-date">Jan 13, 2026</span>
+      ><span class="post-date">Jan 2026</span>
       <p class="post-desc">
-        What I learned getting started with Mesa — the codebase, debugging
-        tools, and making my first patches.
+        Notes from when I first started reading and building Mesa.
       </p>
     </div>
 
@@ -165,10 +162,9 @@
         ><a href="posts/how-graphics-drivers-work.html"
           >How do graphics drivers work?</a
         ></span
-      ><span class="post-date">Dec 29, 2025</span>
+      ><span class="post-date">Dec 2025</span>
       <p class="post-desc">
-        The mental model I built when I started reading Mesa — kernel driver,
-        userspace driver, shader compiler, and where ACO fits.
+        How I understood the graphics driver stack coming from embedded — kernel, Mesa, shader compiler.
       </p>
     </div>
 
