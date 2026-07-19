@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Mesa build setup, driver selection, source paths, debug options, and a narrow loop.">
+  <meta name="theme-color" content="#0c0e0f">
+  <meta property="og:title" content="Getting started with Mesa">
+  <meta property="og:description" content="Mesa build setup, driver selection, source paths, debug options, and a narrow loop.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://emomaxd.github.io/posts/getting-started-mesa.html">
+  <link rel="canonical" href="https://emomaxd.github.io/posts/getting-started-mesa.html">
+  <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="../feed.xml">
+  <link rel="stylesheet" href="../style.css">
+  <title>Getting started with Mesa — Emre Cecanpunar</title>
+</head>
+<body class="article-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header"><a class="identity" href="../index.html">Emre Cecanpunar</a><nav aria-label="Primary navigation"><a aria-current="page" href="../index.html">Notes</a><a href="../about.html">About</a><a href="../feed.xml">RSS</a></nav></header>
+  <main id="content">
+    <article>
+      <header class="article-header">
+        <h1>Getting started with Mesa</h1>
+        <div class="article-meta"><time datetime="2026-01-13">2026-01-13</time></div>
+      </header>
+      <div class="article-body">
+        <p>Build Mesa small, verify the loaded driver, and let the source tree point the way.</p>
+
+        <h2 id="build">Start broad, then make the build small</h2>
+        <p>A plain setup leaves driver lists on <code>auto</code>:</p>
+        <pre><code>meson setup build -Dbuildtype=debug
+ninja -C build</code></pre>
+        <p><code>meson configure build</code> shows the result afterwards. Once I know the API and driver, I use a narrower build directory:</p>
+        <pre><code>meson setup build-intel -Dbuildtype=debug \
+  -Dvulkan-drivers=intel -Dgallium-drivers=iris
+
+meson setup build-mali -Dbuildtype=debug \
+  -Dvulkan-drivers=panfrost -Dgallium-drivers=panfrost</code></pre>
+        <p>Keeping a broad build beside a small one keeps configuration issues obvious.</p>
+
+        <h2 id="incremental">Let Ninja tell you the target</h2>
+        <p><code>ninja -C build</code> is incremental. Naming a target is still useful when the build contains unrelated tools or drivers.</p>
+        <pre><code>ninja -C build -t targets all | rg 'libnir|libvulkan'
+ninja -C build src/compiler/nir/libnir.a.p/nir.c.o</code></pre>
+        <p>Object paths depend on the Meson target, so I take them from <code>-t targets all</code> instead of guessing.</p>
+        <p>These commands help inspect the work:</p>
+        <pre><code>ninja -C build -n &lt;target&gt;
+ninja -C build -t commands &lt;target&gt;
+ninja -C build -v &lt;target&gt;</code></pre>
+        <p><code>-t commands</code> is useful when I need exact flags for one object.</p>
+
+        <h2 id="local">Run the build you think you are running</h2>
+        <p>Mesa's documented easy path is <a href="https://docs.mesa3d.org/install.html">Meson's development environment</a>:</p>
+        <pre><code>meson devenv -C build vulkaninfo
+meson devenv -C build glxinfo -B</code></pre>
+        <p>It sets <code>VK_DRIVER_FILES</code> and adds the build's driver directories to <code>LD_LIBRARY_PATH</code>. Relative paths are resolved from the build directory.</p>
+        <p>For manual control, install into a disposable prefix:</p>
+        <pre><code>export MESA_INSTALLDIR="$PWD/install"
+meson setup build-install -Dprefix="$MESA_INSTALLDIR" &lt;other options&gt;
+meson install -C build-install
+
+VK_DRIVER_FILES="$MESA_INSTALLDIR/share/vulkan/icd.d/&lt;driver&gt;_icd.x86_64.json" vulkaninfo
+LD_LIBRARY_PATH="$MESA_INSTALLDIR/lib64" glxinfo -B</code></pre>
+        <p>The library directory may be <code>lib</code> rather than <code>lib64</code>. I check the selected implementation in <code>vulkaninfo</code> or <code>glxinfo -B</code>.</p>
+        <p><code>DRI_PRIME_DEBUG=1</code> explains device selection. <code>DRI_PRIME</code> picks another device. <code>MESA_LOADER_DRIVER_OVERRIDE</code> is only for debugging.</p>
+
+        <h2 id="tree">Read paths, not directories</h2>
+        <p>Mesa is several shared layers in <a href="https://docs.mesa3d.org/sourcetree.html">one source tree</a>. I start from an API entry point, a debug string, a stack trace, or an IR dump, then follow the boundary I care about.</p>
+        <pre><code>rg 'vkCreateGraphicsPipelines' src/
+rg 'NIR_PASS.*nir_opt_' src/
+rg 'DEBUG|DUMP|VALIDATE' src/&lt;driver&gt;/</code></pre>
+        <p>Searching for the literal text of a log message is often faster than guessing the subsystem. Generated files can hide definitions, so I also search <code>build/</code>.</p>
+
+        <h2 id="debug">Discover debug switches instead of memorizing them</h2>
+        <p>Mesa has <a href="https://docs.mesa3d.org/envvars.html">common controls</a> such as <code>MESA_DEBUG</code>, <code>MESA_LOG_FILE</code>, <code>NIR_DEBUG</code>, and <code>GALLIUM_HUD</code>, plus driver-specific variables.</p>
+        <pre><code>NIR_DEBUG=help &lt;small-reproducer&gt;
+GALLIUM_HUD=help &lt;small-reproducer&gt;
+rg 'getenv\(|debug_get_flags|_DEBUG' src/&lt;driver&gt;/</code></pre>
+        <p>Many driver variables also accept <code>help</code>. I start with the smallest reproducer, redirect noisy output, and keep the full environment with the result.</p>
+        <p>For compiler work, I compare before and after at the earliest IR boundary. For runtime problems, I separate loader selection, CPU work, submission, and GPU execution.</p>
+
+        <h2 id="sanitizers">Keep sanitizer builds separate</h2>
+        <p>Undefined behaviour and memory errors on the CPU side can look like driver or GPU failures. <a href="https://docs.mesa3d.org/graphics-debugging/debugging-misrenderings-crashes.html">Mesa's debugging guide</a> suggests UBSan and thread sanitizer. I also keep an ASan/UBSan build:</p>
+        <pre><code>meson setup build-san -Dbuildtype=debugoptimized \
+  -Db_sanitize=address,undefined &lt;driver options&gt;
+ninja -C build-san
+meson devenv -C build-san &lt;small-reproducer&gt;
+
+meson setup build-tsan -Dbuildtype=debugoptimized \
+  -Db_sanitize=thread &lt;driver options&gt;
+ninja -C build-tsan
+meson devenv -C build-tsan &lt;small-reproducer&gt;</code></pre>
+        <p><code>debugoptimized</code> keeps debug information and assertions. Sanitizer output is evidence, not a verdict.</p>
+
+        <h2 id="bisect">Make regressions searchable</h2>
+        <p>If the same reproducer is good at an older commit and bad now, <a href="https://git-scm.com/docs/git-bisect"><code>git bisect</code></a> is usually better than reading the commits in between:</p>
+        <pre><code>git bisect start &lt;bad-commit&gt; &lt;good-commit&gt;
+git bisect run ./repro.sh
+git bisect reset</code></pre>
+        <p>The script must make its result mechanical: 0 for good, 1–127 except 125 for bad, and 125 when the commit cannot be tested. It should build only what is needed.</p>
+
+        <h2 id="loop">Keep the loop small</h2>
+        <p>The loop I try to keep is: reproduce, capture one boundary, change one thing, rebuild the narrowest target, and compare. A known-good build or worktree helps.</p>
+        <p class="note">Build options and debug flags are developer interfaces. These notes describe the method I use; check <code>meson configure</code>, the current documentation, and the source tree for the exact names in your checkout.</p>
+
+      </div>
+    </article>
+    <nav class="article-nav" aria-label="Article navigation"><a href="aco-standalone-tool.html">← aco_dump</a><a href="how-graphics-drivers-work.html">How graphics drivers work →</a></nav>
+  </main>
+  <footer><p>Site updated <time datetime="2026-07-19">2026-07-19</time></p></footer>
+</body>
+</html>

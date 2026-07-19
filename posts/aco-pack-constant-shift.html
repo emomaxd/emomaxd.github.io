@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An ACO optimizer experiment whose focused case worked but never triggered in shader-db.">
+  <meta name="theme-color" content="#0c0e0f">
+  <meta property="og:title" content="aco-pack-constant shift: a patch that never fired">
+  <meta property="og:description" content="An ACO optimizer experiment whose focused case worked but never triggered in shader-db.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://emomaxd.github.io/posts/aco-pack-constant-shift.html">
+  <link rel="canonical" href="https://emomaxd.github.io/posts/aco-pack-constant-shift.html">
+  <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="../feed.xml">
+  <link rel="stylesheet" href="../style.css">
+  <title>aco-pack-constant shift: a patch that never fired — Emre Cecanpunar</title>
+</head>
+<body class="article-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header"><a class="identity" href="../index.html">Emre Cecanpunar</a><nav aria-label="Primary navigation"><a aria-current="page" href="../index.html">Notes</a><a href="../about.html">About</a><a href="../feed.xml">RSS</a></nav></header>
+  <main id="content">
+    <article>
+      <header class="article-header">
+        <h1>aco-pack-constant shift: a patch that never fired</h1>
+        <div class="article-meta"><time datetime="2026-05-08">2026-05-08</time><span>status: abandoned</span></div>
+      </header>
+      <div class="article-body">
+        <p>The patch was small. The focused case worked, shader-db produced zero hits, and the optimization never left my branch.</p>
+
+        <h2 id="found">How I found it</h2>
+        <p>I found a TODO in <code>aco_optimizer.cpp</code> about a missing constant-folding case around packed operations and followed it.</p>
+
+        <h2 id="transformation">The transformation</h2>
+        <p>Before GFX11, the relevant <code>pack_hl</code> form was not directly available in the ISA. If an operand is constant, shifting that constant can allow the operation to use an <code>_ll</code> or <code>_hh</code> form instead.</p>
+
+        <h2 id="test">A focused case is not a workload</h2>
+        <p>I implemented the case and constructed the IR pattern I needed. The transformation worked. Then I ran shader-db over real shaders: no hit.</p>
+        <p>The focused case showed that the code transformed a synthetic input. It did not show that the pattern reached this optimizer.</p>
+
+        <h2 id="pattern">Where the pattern went</h2>
+        <p>The likely explanation was an earlier simplification: NIR or another part of the pipeline had already removed the pattern before ACO could see it. I did not isolate the exact pass.</p>
+        <p>Zero hits do not settle a patch by themselves. I have found other issues through sanitizer builds, tests, real hardware, and code reading that normal workloads rarely reach. A change may still matter for correctness; if the pattern is guaranteed to disappear earlier, it is only duplicate work.</p>
+
+        <h2 id="survived">What survived</h2>
+        <p>The optimizer change did not. The useful lesson was to capture IR at the boundary before implementing a backend combine.</p>
+        <p class="note">Artifact status: no MR was opened and the experimental branch is not linked here. This is a failure note, not an upstreamed Mesa change.</p>
+      </div>
+    </article>
+    <nav class="article-nav" aria-label="Article navigation"><a href="../index.html">← All notes</a><a href="aco-standalone-tool.html">aco_dump →</a></nav>
+  </main>
+  <footer><p>Site updated <time datetime="2026-07-19">2026-07-19</time></p></footer>
+</body>
+</html>

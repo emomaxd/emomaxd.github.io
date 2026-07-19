@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Emre Cecanpunar — notes</title>
+    <link>https://emomaxd.github.io/</link>
+    <description>Notes on Linux graphics, GPU drivers and compilers.</description>
+    <language>en</language>
+    <atom:link href="https://emomaxd.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>aco-pack-constant shift: a patch that never fired</title>
+      <link>https://emomaxd.github.io/posts/aco-pack-constant-shift.html</link>
+      <guid>https://emomaxd.github.io/posts/aco-pack-constant-shift.html</guid>
+      <pubDate>Fri, 08 May 2026 00:00:00 +0300</pubDate>
+      <description>An ACO optimizer experiment that never triggered in shader-db.</description>
+    </item>
+    <item>
+      <title>aco_dump: compiling shaders without a GPU</title>
+      <link>https://emomaxd.github.io/posts/aco-standalone-tool.html</link>
+      <guid>https://emomaxd.github.io/posts/aco-standalone-tool.html</guid>
+      <pubDate>Fri, 20 Mar 2026 00:00:00 +0300</pubDate>
+      <description>SPIR-V to ACO IR through RADV/ACO without a physical GPU.</description>
+    </item>
+    <item>
+      <title>Getting started with Mesa</title>
+      <link>https://emomaxd.github.io/posts/getting-started-mesa.html</link>
+      <guid>https://emomaxd.github.io/posts/getting-started-mesa.html</guid>
+      <pubDate>Tue, 13 Jan 2026 00:00:00 +0300</pubDate>
+      <description>Mesa build setup, driver selection, source paths, and debug switches.</description>
+    </item>
+    <item>
+      <title>How graphics drivers work</title>
+      <link>https://emomaxd.github.io/posts/how-graphics-drivers-work.html</link>
+      <guid>https://emomaxd.github.io/posts/how-graphics-drivers-work.html</guid>
+      <pubDate>Mon, 29 Dec 2025 00:00:00 +0300</pubDate>
+      <description>A short map from Vulkan calls to GPU machine code.</description>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A short map of the Linux graphics stack from Vulkan to GPU machine code.">
+  <meta name="theme-color" content="#0c0e0f">
+  <meta property="og:title" content="How graphics drivers work">
+  <meta property="og:description" content="A short map of the Linux graphics stack from Vulkan to GPU machine code.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://emomaxd.github.io/posts/how-graphics-drivers-work.html">
+  <link rel="canonical" href="https://emomaxd.github.io/posts/how-graphics-drivers-work.html">
+  <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="../feed.xml">
+  <link rel="stylesheet" href="../style.css">
+  <title>How graphics drivers work — Emre Cecanpunar</title>
+</head>
+<body class="article-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header"><a class="identity" href="../index.html">Emre Cecanpunar</a><nav aria-label="Primary navigation"><a aria-current="page" href="../index.html">Notes</a><a href="../about.html">About</a><a href="../feed.xml">RSS</a></nav></header>
+  <main id="content">
+    <article>
+      <header class="article-header">
+        <h1>How graphics drivers work</h1>
+        <div class="article-meta"><time datetime="2025-12-29">2025-12-29</time></div>
+      </header>
+      <div class="article-body">
+        <p>This is the map I needed before I could read graphics-driver code without getting lost.</p>
+
+        <h2 id="compressed">The compressed version</h2>
+        <p>If we temporarily ignore firmware, loaders, window systems, and several important boundaries, the path has three useful pieces: a kernel driver, a userspace API driver, and a shader compiler.</p>
+        <pre><code>Vulkan application
+       │ SPIR-V + pipeline state
+       ▼
+Mesa Vulkan driver
+       ├─ SPIR-V → NIR → target backend → GPU machine code
+       └─ commands and resources → DRM kernel driver → GPU</code></pre>
+
+        <h2 id="kernel">Kernel and userspace</h2>
+        <p>The kernel driver owns work that requires kernel authority: memory management, command submission from multiple processes, display, power management, and recovery after a hang. On Linux these drivers live in DRM and differ by hardware family.</p>
+        <p>A Mesa userspace driver implements an API such as Vulkan or OpenGL. It consumes application state, builds pipelines and command buffers, manages resources, and eventually talks to the matching kernel driver through ioctls when work is submitted. The API-facing driver and kernel driver are separate pieces even when they support the same GPU.</p>
+
+        <h2 id="compiler">The compiler path</h2>
+        <p>Vulkan applications normally provide shaders as SPIR-V. Mesa drivers translate SPIR-V to NIR, run shared and driver-specific lowerings and optimizations, then hand the result to a target backend. That backend selects instructions, allocates registers, schedules instructions, and emits machine code for the selected GPU.</p>
+        <p>The shared IR is important, but the end of the pipeline is hardware-specific. GPU generations differ in instructions, encodings, hazards, register files, and execution details, so machine code for one target is not a portable GPU binary.</p>
+
+        <h2 id="runtime">Why compilation happens at runtime</h2>
+        <p>With a microcontroller I can cross-compile for a fixed target and flash the result. Vulkan keeps SPIR-V portable and lets the driver compile for the GPU and driver implementation actually present on the machine.</p>
+        <p>Applications can build pipelines ahead of their first draw, reuse pipeline caches, or compile work in the background. When compilation still lands on a latency-sensitive path, users see the familiar shader or pipeline-compilation stutter. “The first time a shader is seen” is a useful approximation, not the whole lifecycle.</p>
+
+        <h2 id="omissions">What this map leaves out</h2>
+        <p>Display, WSI, firmware, synchronization, memory residency, shader caches, and the distinction between pipeline state and shader compilation each deserve their own map. This one only establishes the path I needed before reading a driver and its compiler.</p>
+      </div>
+    </article>
+    <nav class="article-nav" aria-label="Article navigation"><a href="getting-started-mesa.html">← Getting started with Mesa</a><a href="../index.html">All notes →</a></nav>
+  </main>
+  <footer><p>Site updated <time datetime="2026-07-19">2026-07-19</time></p></footer>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Running SPIR-V through RADV and ACO without a physical GPU using drm-shim.">
+  <meta name="theme-color" content="#0c0e0f">
+  <meta property="og:title" content="aco_dump: compiling shaders without a GPU">
+  <meta property="og:description" content="Running SPIR-V through RADV and ACO without a physical GPU using drm-shim.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://emomaxd.github.io/posts/aco-standalone-tool.html">
+  <link rel="canonical" href="https://emomaxd.github.io/posts/aco-standalone-tool.html">
+  <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="../feed.xml">
+  <link rel="stylesheet" href="../style.css">
+  <title>aco_dump: compiling shaders without a GPU — Emre Cecanpunar</title>
+</head>
+<body class="article-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header"><a class="identity" href="../index.html">Emre Cecanpunar</a><nav aria-label="Primary navigation"><a aria-current="page" href="../index.html">Notes</a><a href="../about.html">About</a><a href="../feed.xml">RSS</a></nav></header>
+  <main id="content">
+    <article>
+      <header class="article-header">
+        <h1>aco_dump: compiling shaders without a GPU</h1>
+        <div class="article-meta"><time datetime="2026-03-20">2026-03-20</time></div>
+      </header>
+      <div class="article-body">
+        <p><code>aco_dump</code> runs a SPIR-V binary through the RADV/ACO pipeline and dumps ACO IR. No physical GPU required.</p>
+        <p>I proposed it upstream; the discussion is in <a href="https://gitlab.freedesktop.org/mesa/mesa/-/issues/15111">Mesa issue #15111</a>.</p>
+
+        <h2 id="problem">The problem</h2>
+        <p>The usual path to inspect ACO output starts with an AMD GPU and a Vulkan application. That is a lot of machinery when the question is only “what does ACO do to this SPIR-V on gfx9?”</p>
+        <p>I wanted the compiler-shaped version: one <code>.spv</code> file in, ACO IR out, target selected on the command line.</p>
+
+        <h2 id="works">How it works</h2>
+        <p><code>drm-shim</code> intercepts DRM ioctls and presents enough fake hardware for driver initialization. RADV sees the selected target and initializes normally.</p>
+        <p><code>PipelineBuilder</code> is Mesa's internal test utility. I used it for direct control over pipeline state.</p>
+
+        <h2 id="usage">Usage</h2>
+        <pre><code>ninja -C build src/amd/compiler/tests/aco_dump</code></pre>
+        <p>Compute shader:</p>
+        <pre><code>LD_PRELOAD=build/src/amd/drm-shim/libamdgpu_noop_drm_shim.so \
+  build/src/amd/compiler/tests/aco_dump gfx9 cs compute.spv</code></pre>
+        <p>Vertex and fragment pipeline:</p>
+        <pre><code>LD_PRELOAD=build/src/amd/drm-shim/libamdgpu_noop_drm_shim.so \
+  build/src/amd/compiler/tests/aco_dump gfx10 vsfs vert.spv frag.spv</code></pre>
+        <p>The version discussed supports gfx6 through gfx12 and has two modes: <code>cs</code> for compute and <code>vsfs</code> for vertex plus fragment.</p>
+
+        <h2 id="boundary">The maintenance boundary</h2>
+        <p>The hard part was maintenance. RADV internals move often, so keeping the tool beside the existing ACO test infrastructure made the dependency explicit.</p>
+        <p class="note">This note describes the proposed version of the tool. Check the linked upstream issue before relying on the paths or command-line interface; both may change with Mesa.</p>
+      </div>
+    </article>
+    <nav class="article-nav" aria-label="Article navigation"><a href="aco-pack-constant-shift.html">← constant shift</a><a href="getting-started-mesa.html">Getting started with Mesa →</a></nav>
+  </main>
+  <footer><p>Site updated <time datetime="2026-07-19">2026-07-19</time></p></footer>
+</body>
+</html>
