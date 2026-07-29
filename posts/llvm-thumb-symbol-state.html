@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Tracing a late .type bug through LLVM MC, and how GNU as preserves the right state for Arm and Thumb function symbols.">
+  <meta name="theme-color" content="#ffffff">
+  <meta property="og:title" content="Label state, not directive state, for Thumb symbols — emomaxd">
+  <meta property="og:description" content="Tracing a late .type bug through LLVM MC, and how GNU as preserves the right state for Arm and Thumb function symbols.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://emomaxd.github.io/posts/llvm-thumb-symbol-state.html">
+  <link rel="canonical" href="https://emomaxd.github.io/posts/llvm-thumb-symbol-state.html">
+  <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="../feed.xml">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+  <title>Label state, not directive state, for Thumb symbols — emomaxd</title>
+</head>
+<body class="article-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header"><a class="identity" href="../index.html">emomaxd</a><nav aria-label="Primary navigation"><a aria-current="page" href="../notes.html">notes</a><a href="../work.html">work</a><a href="../about.html">about</a><a href="../emre-cecanpunar-resume.pdf">cv</a></nav></header>
+  <main id="content">
+    <article>
+      <header class="article-header">
+        <h1>Label state, not directive state, for Thumb symbols</h1>
+        <div class="article-meta"><time datetime="2026-07-26">2026-07-26</time><span>area: llvm / mc / arm</span><span>status: open PR</span><span>tested: ARM MC / check-llvm / GNU as</span></div>
+      </header>
+      <div class="article-body">
+        <p>LLVM's integrated Arm assembler could mark an ARM function as Thumb when its <code>.type</code> directive appeared after a switch to Thumb mode.</p>
+        <p>The patch is in <a href="https://github.com/llvm/llvm-project/pull/211641">LLVM PR #211641</a>. It addresses <a href="https://github.com/llvm/llvm-project/issues/211376">issue #211376</a>.</p>
+
+        <h2 id="picked">Why I picked it</h2>
+        <p>I picked the issue because it was small and bounded. It already had a minimal reproducer, GNU <code>as</code> gave me a reference result, and the relevant LLVM code contained a FIXME that more or less described the fix.</p>
+        <pre><code>This is not expected to occur in practice ...
+... track IsThumb for every label.</code></pre>
+        <p>I did not discover a clever new assembler trick here. <a href="https://github.com/llvm/llvm-project/blob/ee96eb78c540a0dbb5a5e03777ab69492c0350c7/llvm/lib/Target/ARM/MCTargetDesc/ARMELFStreamer.cpp#L602-L617">The FIXME</a> already identified the missing lifetime: LLVM knew the current state, but not the state in which an earlier label had been emitted. My part was verifying that the supposedly impractical case now happened in a real kernel build, following the bad bit to that code, choosing how much state to retain, and writing a test that failed in both directions.</p>
+
+        <h2 id="reproducer">The small reproducer</h2>
+        <pre><code>.text
+.syntax unified
+
+.arm
+.global secondary_startup_arm
+secondary_startup_arm:
+  nop
+
+.thumb
+.global secondary_startup
+secondary_startup:
+  nop
+
+.type secondary_startup, %function
+.type secondary_startup_arm, %function</code></pre>
+        <p><code>secondary_startup_arm</code> is emitted while the assembler is in ARM state. By the time its <code>.type</code> directive is processed, the active state is Thumb.</p>
+
+        <h2 id="bit">The low bit</h2>
+        <p>The Arm ELF ABI <a href="https://github.com/ARM-software/abi-aa/blob/main/aaelf32/aaelf32.rst#symbol-values">marks a Thumb function by setting bit zero of its symbol value</a>. GNU <code>as</code> leaves <code>secondary_startup_arm</code> at <code>0x0</code>. LLVM's integrated assembler produced <code>0x1</code> for the same source.</p>
+        <p>The bit is an instruction-set tag, not an extra byte inserted before the function. The code remains aligned at its real address; consumers clear or interpret bit zero when they need the address and use it to distinguish a Thumb entry point from an Arm one.</p>
+        <pre><code>arm-linux-gnueabihf-as -mthumb test.s -o test-gas.o
+clang --target=arm-linux-gnueabihf -mthumb -c test.s -o test-llvm.o
+
+llvm-readelf -s test-gas.o
+llvm-readelf -s test-llvm.o</code></pre>
+        <p>This is not only an object-file detail. In the reported kernel failure, Linux passed that symbol address to hardware while bringing up a secondary ARM32 CPU. The <a href="https://github.com/ClangBuiltLinux/linux/issues/2177">original report</a> traces the bad address to that path; an incorrect low bit selects the wrong instruction set.</p>
+
+        <h2 id="trace">Tracing the bit backwards</h2>
+        <p>I started at the wrong observable value rather than trying to learn the whole MC layer first. Searching for <code>symbolValue</code>, <code>isThumbFunc</code>, and <code>setIsThumbFunc</code> led from the ELF writer back to <code>ARMELFStreamer::emitSymbolAttribute()</code>.</p>
+        <p>The writer was doing what it was told: set bit zero when the assembler says a symbol is a Thumb function. The bad decision had already happened while processing <code>.type</code>.</p>
+
+        <h2 id="cause">The state was read too late</h2>
+        <p>There are two separate events in MC. <a href="https://github.com/llvm/llvm-project/blob/ee96eb78c540a0dbb5a5e03777ab69492c0350c7/llvm/lib/Target/ARM/MCTargetDesc/ARMELFStreamer.cpp#L1088-L1110"><code>ARMTargetELFStreamer::emitLabel()</code></a> sees the symbol when the label is emitted. Later, <a href="https://github.com/llvm/llvm-project/blob/ee96eb78c540a0dbb5a5e03777ab69492c0350c7/llvm/lib/Target/ARM/MCTargetDesc/ARMELFStreamer.cpp#L619-L632"><code>ARMELFStreamer::emitSymbolAttribute()</code></a> sees the <code>.type</code> directive.</p>
+        <p>Before the patch, a label already typed as a function could be marked during <code>emitLabel()</code>. For the opposite order, <code>emitSymbolAttribute()</code> asked whether the streamer was currently in Thumb mode. That answers the state at the directive, not the state at the label.</p>
+        <p>Those states are usually the same, which is why the bug only appears when the directive is delayed across an <code>.arm</code> or <code>.thumb</code> switch.</p>
+
+        <h2 id="gas">What GNU <code>as</code> remembers</h2>
+        <p>GNU <code>as</code> separates the same two facts. Its Arm target hook <a href="https://gnu.googlesource.com/binutils-gdb/+/6e9d2f4fada48f9ac0902150fc17cf3649a208c2/gas/config/tc-arm.c#23526"><code>arm_frob_label()</code></a> runs when a label is defined and records the current <code>thumb_mode</code> in target-specific symbol data. A later <code>.type</code> only needs to add the normal ELF function type.</p>
+        <pre><code>label:  ARM_SET_THUMB(symbol, thumb_mode)
+.type:  add BSF_FUNCTION
+output: ARM_IS_THUMB &amp;&amp; BSF_FUNCTION
+          → ST_BRANCH_TO_THUMB
+          → st_value |= 1</code></pre>
+        <p>The combination is visible in GAS's <a href="https://gnu.googlesource.com/binutils-gdb/+/6e9d2f4fada48f9ac0902150fc17cf3649a208c2/gas/config/tc-arm.h#132"><code>THUMB_IS_FUNC</code> definition</a>. During <a href="https://gnu.googlesource.com/binutils-gdb/+/6e9d2f4fada48f9ac0902150fc17cf3649a208c2/gas/config/tc-arm.c#29918">symbol-table adjustment</a> it becomes a Thumb branch target, and the BFD ELF writer <a href="https://gnu.googlesource.com/binutils-gdb/+/6e9d2f4fada48f9ac0902150fc17cf3649a208c2/bfd/elf32-arm.c#19662">sets bit zero when writing a defined Thumb function</a>.</p>
+        <p>GAS also <a href="https://gnu.googlesource.com/binutils-gdb/+/6e9d2f4fada48f9ac0902150fc17cf3649a208c2/gas/config/tc-arm.c#2898">emits <code>$a</code> and <code>$t</code> mapping symbols</a> when code changes state. Those describe ranges inside a section for tools such as disassemblers; they do not replace the function symbol's own Arm/Thumb state.</p>
+
+        <h2 id="workarounds">Fixing the caller versus fixing the assembler</h2>
+        <p>The failure is also tracked as <a href="https://github.com/ClangBuiltLinux/linux/issues/2177">ClangBuiltLinux issue #2177</a>. The kernel side produced two ways to avoid this particular failure without changing LLVM. One <a href="https://github.com/TeamYogaBlade2/linux/commit/d7633f01ec25209fc6cdde012128b19ac336ab18">moves <code>ENDPROC(secondary_startup_arm)</code></a> before the source switches to Thumb, so the generated <code>.type</code> is processed while the assembler is still in ARM state. A later <a href="https://github.com/TeamYogaBlade2/linux/commit/061c2d6ff23080beb140dadc4743728f7b584233">MediaTek-specific patch</a> clears bit zero before writing the startup address to the hardware jump register; its mailing-list submission is <a href="https://lore.kernel.org/llvm/20260722172443.534251-1-akkun11.open@gmail.com/">here</a>.</p>
+        <p>Both contain the kernel failure, but neither changes what LLVM emits for the reproducer. The same valid assembly would still produce a different symbol value under LLVM and GNU <code>as</code>. That is why I worked on the assembler rather than adding a third caller-side workaround.</p>
+
+        <h2 id="fix">Recording label-time state</h2>
+        <p>The patch records symbols emitted in Thumb state. When a later <code>.type</code> marks a symbol as a function, the streamer consults that recorded label state instead of its current state.</p>
+        <p>My first version stored a Boolean for every label in a <code>DenseMap</code>. The current version uses a <code>DenseSet</code> because the consumer asks only whether a label was emitted in Thumb state; absence already represents an ARM label. This also avoids storing a false entry for every ARM label.</p>
+        <p>The <a href="https://github.com/llvm/llvm-project/blob/f42e920510ced71dccb74aadc564aed2fbb9ad18/llvm/lib/Target/ARM/MCTargetDesc/ARMELFStreamer.cpp#L603-L730">implementation</a> keeps that set in the ARM ELF streamer and clears it on reset. The <a href="https://github.com/llvm/llvm-project/blob/f42e920510ced71dccb74aadc564aed2fbb9ad18/llvm/test/MC/ARM/thumb-state-on-late-type.s">regression test</a> covers both directions and checks the final symbol table through <code>llvm-readelf</code>. It failed in both directions before the patch. Locally, all 577 ARM MC tests passed after the change, followed by <code>check-llvm</code> with no unexpected failures.</p>
+
+      </div>
+    </article>
+    <nav class="article-nav" aria-label="Article navigation"><a href="../notes.html">← All notes</a><a href="nuttx-rk3588s-bringup.html">RK3588S bring-up →</a></nav>
+  </main>
+  <footer><p><a href="../feed.xml">rss</a></p><p>updated <time datetime="2026-07-26">2026-07-26</time></p></footer>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .mark {
+      color: #674f79;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .mark {
+        color: #b6a2c7;
+      }
+    }
+  </style>
+
+  <g class="mark" fill="currentColor">
+    <path
+      fill-rule="evenodd"
+      d="M32 2 44 19 32 30 20 19 32 2Zm0 7 6 9-6 6-6-6 6-9Z"
+    />
+  </g>
+  <g
+    class="mark"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="4"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M32 26v35"/>
+    <path d="M32 37c-7-1-10 2-10 8s4 10 10 9"/>
+    <path d="M32 37c7-1 10 2 10 8s-4 10-10 9"/>
+  </g>
+</svg>

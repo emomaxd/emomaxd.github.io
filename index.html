@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Emre Cecanpunar works on GPU compilers, graphics drivers, and low-level systems.">
+    <meta name="author" content="Emre Cecanpunar">
+    <meta name="theme-color" content="#ffffff">
+    <meta property="og:site_name" content="emomaxd">
+    <meta property="og:title" content="emomaxd">
+    <meta property="og:description" content="GPU compilers, graphics drivers, and low-level systems.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://emomaxd.github.io/">
+    <link rel="canonical" href="https://emomaxd.github.io/">
+    <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="feed.xml">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://emomaxd.github.io/#website",
+            "url": "https://emomaxd.github.io/",
+            "name": "emomaxd",
+            "alternateName": "emomaxd.github.io",
+            "author": {
+              "@id": "https://emomaxd.github.io/#person"
+            }
+          },
+          {
+            "@type": "Person",
+            "@id": "https://emomaxd.github.io/#person",
+            "name": "Emre Cecanpunar",
+            "alternateName": "emomaxd",
+            "url": "https://emomaxd.github.io/",
+            "sameAs": [
+              "https://github.com/emomaxd",
+              "https://gitlab.freedesktop.org/emomaxd",
+              "https://www.linkedin.com/in/emre-cecanpunar"
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>emomaxd</title>
+  </head>
+  <body class="index-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <main id="content">
+      <header class="hero">
+        <h1>
+          <button class="name-toggle" type="button" aria-label="Toggle between full name and handle">
+            <span class="name-part">Emre</span> <span class="name-part">Cecanpunar</span>
+          </button>
+        </h1>
+        <div class="home-intro">
+          <div class="home-copy">
+            <button
+              class="home-raven"
+              type="button"
+              aria-label="Turn the raven into an octopus"
+            >🐦‍⬛</button>
+            <p class="lede">
+              I’m a GPU compiler and driver developer working across Mesa,
+              LLVM, and the Linux kernel. I like understanding what the
+              hardware is actually doing. My
+              <a href="work.html">work</a>, <a href="about.html">about
+              page</a>, and <a href="emre-cecanpunar-resume.pdf">CV</a> are
+              available here.
+            </p>
+          </div>
+          <img
+            class="home-photo"
+            src="assets/images/emre-2026.jpg"
+            alt="Portrait of Emre"
+            width="960"
+            height="1280"
+            decoding="async"
+            fetchpriority="high"
+          >
+        </div>
+      </header>
+
+      <section class="home-section" aria-labelledby="home-notes">
+        <div class="section-heading">
+          <h2 id="home-notes">notes</h2>
+        </div>
+        <ol class="compact-list">
+          <li>
+            <span class="compact-meta"><time datetime="2026-07-26">2026-07-26</time> · llvm / mc / arm</span>
+            <a href="posts/llvm-thumb-symbol-state.html">Label state, not directive state, for Thumb symbols&nbsp;→</a>
+          </li>
+          <li>
+            <span class="compact-meta"><time datetime="2026-07-26">2026-07-26</time> · nuttx / arm64</span>
+            <a href="posts/nuttx-rk3588s-bringup.html">Booting NuttX on RK3588S&nbsp;→</a>
+          </li>
+          <li>
+            <span class="compact-meta"><time datetime="2026-05-08">2026-05-08</time> · mesa / aco</span>
+            <a href="posts/aco-pack-constant-shift.html">aco-pack-constant shift: a patch that never fired&nbsp;→</a>
+          </li>
+          <li>
+            <span class="compact-meta"><time datetime="2026-03-20">2026-03-20</time> · mesa / radv / aco</span>
+            <a href="posts/aco-standalone-tool.html">aco_dump: compiling shaders without a GPU&nbsp;→</a>
+          </li>
+          <li>
+            <span class="compact-meta"><time datetime="2026-01-13">2026-01-13</time> · mesa</span>
+            <a href="posts/getting-started-mesa.html">My Mesa build and debug loop&nbsp;→</a>
+          </li>
+          <li>
+            <span class="compact-meta"><time datetime="2025-12-29">2025-12-29</time> · linux graphics</span>
+            <a href="posts/how-graphics-drivers-work.html">A working map of the Linux graphics stack&nbsp;→</a>
+          </li>
+        </ol>
+      </section>
+    </main>
+
+    <footer>
+      <p><a href="feed.xml">rss</a></p>
+      <p>updated <time datetime="2026-07-29">2026-07-29</time></p>
+    </footer>
+    <script>
+      const nameToggle = document.querySelector(".name-toggle");
+
+      if (nameToggle) {
+        const fullNameMarkup = nameToggle.innerHTML;
+        let showingAlias = false;
+
+        nameToggle.addEventListener("click", () => {
+          showingAlias = !showingAlias;
+
+          if (showingAlias) {
+            nameToggle.textContent = "emomaxd";
+          } else {
+            nameToggle.innerHTML = fullNameMarkup;
+          }
+        });
+      }
+
+      const mascotToggle = document.querySelector(".home-raven");
+
+      if (mascotToggle) {
+        let showingOctopus = false;
+
+        mascotToggle.addEventListener("click", () => {
+          showingOctopus = !showingOctopus;
+          mascotToggle.textContent = showingOctopus ? "🐙" : "🐦‍⬛";
+          mascotToggle.setAttribute(
+            "aria-label",
+            showingOctopus
+              ? "Turn the octopus back into a raven"
+              : "Turn the raven into an octopus"
+          );
+          mascotToggle.classList.remove("is-changing");
+          void mascotToggle.offsetWidth;
+          mascotToggle.classList.add("is-changing");
+        });
+      }
+    </script>
+  </body>
+</html>

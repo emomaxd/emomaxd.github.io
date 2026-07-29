@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Selected upstream work by Emre Cecanpunar in GPU compilers, graphics drivers, Linux, LLVM, and Apache NuttX.">
+    <meta name="author" content="Emre Cecanpunar">
+    <meta name="theme-color" content="#ffffff">
+    <meta property="og:title" content="work — emomaxd">
+    <meta property="og:description" content="Selected work in GPU compilers, graphics drivers, and low-level systems.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://emomaxd.github.io/work.html">
+    <link rel="canonical" href="https://emomaxd.github.io/work.html">
+    <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="feed.xml">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css">
+    <title>work — emomaxd</title>
+  </head>
+  <body class="work-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <a class="identity" href="index.html">emomaxd</a>
+      <nav aria-label="Primary navigation">
+        <a href="notes.html">notes</a>
+        <a aria-current="page" href="work.html">work</a>
+        <a href="about.html">about</a>
+        <a href="emre-cecanpunar-resume.pdf">cv</a>
+      </nav>
+    </header>
+
+    <main id="content">
+      <header class="page-intro">
+        <h1>Work</h1>
+        <p>Selected upstream patches, ports, and experiments.</p>
+      </header>
+
+      <section class="work-group" aria-labelledby="compilers-drivers">
+        <h2 id="compilers-drivers">compilers and drivers</h2>
+        <div class="work-list">
+          <article>
+            <div class="work-meta"><span>mesa / compilers and drivers</span><strong>merged fixes</strong></div>
+            <h3>Mesa fixes</h3>
+            <p>Focused fixes in compiler allocation lifetime and driver compiler initialization.</p>
+            <p class="work-links"><a href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42950">Jay ↗</a><a href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43021">KosmicKrisp ↗</a></p>
+          </article>
+          <article>
+            <div class="work-meta"><span>mesa / radv / aco</span><strong>prototype · not upstreamed</strong></div>
+            <h3>Standalone ACO shader compilation</h3>
+            <p>Ran arbitrary SPIR-V through RADV and ACO with drm-shim and no physical AMD GPU.</p>
+            <p class="work-links"><a href="https://gitlab.freedesktop.org/mesa/mesa/-/issues/15111">discussion ↗</a><a href="posts/aco-standalone-tool.html">note →</a></p>
+          </article>
+          <article>
+            <div class="work-meta"><span>llvm / mc / arm</span><strong>open PR</strong></div>
+            <h3>Label-time state for Thumb function symbols</h3>
+            <p>Use the recorded ISA state from label emission instead of state at a later type directive.</p>
+            <p class="work-links"><a href="https://github.com/llvm/llvm-project/pull/211641">patch ↗</a><a href="posts/llvm-thumb-symbol-state.html">note →</a></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="work-group" aria-labelledby="systems">
+        <h2 id="systems">systems</h2>
+        <div class="work-list">
+          <article>
+            <div class="work-meta"><span>apache nuttx / arm64</span><strong>merged</strong></div>
+            <h3>RK3588S and Orange Pi 5 Pro port</h3>
+            <p>Brought up the initial ARM64 port through U-Boot to NSH, including GICv3, timer, UART, and PSCI support.</p>
+            <p class="work-links"><a href="https://github.com/apache/nuttx/pull/19489">patch ↗</a><a href="posts/nuttx-rk3588s-bringup.html">note →</a><a href="https://nuttx.apache.org/docs/latest/platforms/arm64/rk3588/boards/orangepi-5-pro/index.html">docs ↗</a><a href="https://www.linkedin.com/feed/update/urn:li:share:7485040669955198976/">announcement ↗</a></p>
+          </article>
+          <article>
+            <div class="work-meta"><span>linux / drm / platform</span><strong>ongoing</strong></div>
+            <h3>Kernel and DRM fixes</h3>
+            <p>Worked on focused C fixes across hp-wmi and i915.</p>
+            <p class="work-links"><a href="https://lore.kernel.org/all/?q=emreleno@gmail.com">patches ↗</a></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="work-group" aria-labelledby="other-work">
+        <h2 id="other-work">other upstream work</h2>
+        <div class="work-list">
+          <article>
+            <div class="work-meta"><span>wayland / memory safety</span><strong>merged / open MR</strong></div>
+            <h3>Userspace memory-safety fixes</h3>
+            <p>Merged an overflow fix in egl-wayland2 parsing and submitted a use-after-free fix for Wayland shared-memory buffer creation.</p>
+            <p class="work-links"><a href="https://github.com/NVIDIA/egl-wayland2/pull/52">egl-wayland2 ↗</a><a href="https://gitlab.freedesktop.org/wayland/wayland/-/merge_requests/549">Wayland ↗</a></p>
+          </article>
+          <article>
+            <div class="work-meta"><span>project / linux</span><strong>active</strong></div>
+            <h3>hpfand</h3>
+            <p>A fail-safe fan-control daemon for HP Victus and Omen laptops.</p>
+            <p class="work-links"><a href="https://github.com/emomaxd/hpfand">source ↗</a></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="work-group" aria-labelledby="upstream-activity">
+        <h2 id="upstream-activity">upstream activity</h2>
+        <div class="activity-links">
+          <a href="https://gitlab.freedesktop.org/mesa/mesa/-/commits/main?author=emreleno@gmail.com">mesa commits ↗</a>
+          <a href="https://lore.kernel.org/all/?q=emreleno@gmail.com">linux patches ↗</a>
+          <a href="https://github.com/llvm/llvm-project/pulls?q=author%3Aemomaxd">llvm PRs ↗</a>
+          <a href="https://github.com/apache/nuttx/pulls?q=author%3Aemomaxd">nuttx PRs ↗</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p><a href="feed.xml">rss</a></p>
+      <p>updated <time datetime="2026-07-26">2026-07-26</time></p>
+    </footer>
+  </body>
+</html>

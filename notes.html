@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Technical notes by Emre Cecanpunar on GPU compilers, graphics drivers, and low-level systems.">
+    <meta name="author" content="Emre Cecanpunar">
+    <meta name="theme-color" content="#ffffff">
+    <meta property="og:title" content="notes — emomaxd">
+    <meta property="og:description" content="Technical notes on GPU compilers, graphics drivers, and low-level systems.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://emomaxd.github.io/notes.html">
+    <link rel="canonical" href="https://emomaxd.github.io/notes.html">
+    <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="feed.xml">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css">
+    <title>notes — emomaxd</title>
+  </head>
+  <body class="notes-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <a class="identity" href="index.html">emomaxd</a>
+      <nav aria-label="Primary navigation">
+        <a aria-current="page" href="notes.html">notes</a>
+        <a href="work.html">work</a>
+        <a href="about.html">about</a>
+        <a href="emre-cecanpunar-resume.pdf">cv</a>
+      </nav>
+    </header>
+
+    <main id="content">
+      <header class="page-intro">
+        <h1>Notes</h1>
+        <p>Debugging records, experiments, and maps for finding my way back.</p>
+      </header>
+
+      <ol class="post-list">
+        <li>
+          <article>
+            <div class="post-meta"><time datetime="2026-07-26">2026-07-26</time><span>llvm / mc / arm</span><span>open PR</span></div>
+            <h2><a href="posts/llvm-thumb-symbol-state.html">Label state, not directive state, for Thumb symbols&nbsp;→</a></h2>
+            <p>An Arm assembler bug caused by reading ISA state at a late <code>.type</code> directive.</p>
+          </article>
+        </li>
+        <li>
+          <article>
+            <div class="post-meta"><time datetime="2026-07-26">2026-07-26</time><span>nuttx / arm64</span><span>merged</span></div>
+            <h2><a href="posts/nuttx-rk3588s-bringup.html">Booting NuttX on RK3588S&nbsp;→</a></h2>
+            <p>The initial Orange Pi 5 Pro port, from U-Boot handoff to NSH.</p>
+          </article>
+        </li>
+        <li>
+          <article>
+            <div class="post-meta"><time datetime="2026-05-08">2026-05-08</time><span>mesa / aco</span><span>experiment</span></div>
+            <h2><a href="posts/aco-pack-constant-shift.html">aco-pack-constant shift: a patch that never fired&nbsp;→</a></h2>
+            <p>A focused case worked. Real shaders never produced the pattern.</p>
+          </article>
+        </li>
+        <li>
+          <article>
+            <div class="post-meta"><time datetime="2026-03-20">2026-03-20</time><span>mesa / radv / aco</span><span>prototype</span></div>
+            <h2><a href="posts/aco-standalone-tool.html">aco_dump: compiling shaders without a GPU&nbsp;→</a></h2>
+            <p>Running SPIR-V through RADV and ACO using drm-shim, without physical AMD hardware.</p>
+          </article>
+        </li>
+        <li>
+          <article>
+            <div class="post-meta"><time datetime="2026-01-13">2026-01-13</time><span>mesa</span><span>reference</span></div>
+            <h2><a href="posts/getting-started-mesa.html">My Mesa build and debug loop&nbsp;→</a></h2>
+            <p>Small builds, verified driver loading, source search, sanitizers, and bisecting.</p>
+          </article>
+        </li>
+        <li>
+          <article>
+            <div class="post-meta"><time datetime="2025-12-29">2025-12-29</time><span>linux graphics</span><span>map</span></div>
+            <h2><a href="posts/how-graphics-drivers-work.html">A working map of the Linux graphics stack&nbsp;→</a></h2>
+            <p>The boundaries between a Vulkan application, Mesa, DRM, and GPU machine code.</p>
+          </article>
+        </li>
+      </ol>
+    </main>
+
+    <footer>
+      <p><a href="feed.xml">rss</a></p>
+      <p>updated <time datetime="2026-07-26">2026-07-26</time></p>
+    </footer>
+  </body>
+</html>

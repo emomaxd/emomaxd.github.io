@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="About Emre Cecanpunar and his work on GPU compilers, graphics drivers, Linux, and RTOS bring-up.">
+    <meta name="theme-color" content="#ffffff">
+    <meta property="og:title" content="about — emomaxd">
+    <meta property="og:description" content="GPU compilers, graphics drivers, and low-level systems.">
+    <meta property="og:type" content="profile">
+    <meta property="og:url" content="https://emomaxd.github.io/about.html">
+    <link rel="canonical" href="https://emomaxd.github.io/about.html">
+    <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="feed.xml">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css">
+    <title>about — emomaxd</title>
+  </head>
+  <body class="about-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <a class="identity" href="index.html">emomaxd</a>
+      <nav aria-label="Primary navigation">
+        <a href="notes.html">notes</a>
+        <a href="work.html">work</a>
+        <a aria-current="page" href="about.html">about</a>
+        <a href="emre-cecanpunar-resume.pdf">cv</a>
+      </nav>
+    </header>
+
+    <main id="content">
+      <article class="about">
+        <header class="page-intro about-intro">
+          <h1>About</h1>
+          <div class="about-photo-wrap">
+            <details class="about-photo-joke">
+              <summary
+                aria-label="Reveal the LLVM wyvern joke"
+                title="Reveal a questionable wyvern"
+              >
+                <span class="about-photo-frame">
+                  <img
+                    class="about-photo"
+                    src="assets/images/emre-eagle.jpg"
+                    alt="Emre standing beside an eagle sculpture"
+                    width="960"
+                    height="1280"
+                    decoding="async"
+                    fetchpriority="high"
+                  >
+                  <span class="dragon-callout" aria-hidden="true">
+                    <span>↗ LLVM wyvern?</span>
+                    <span>close enough.</span>
+                  </span>
+                </span>
+              </summary>
+              <span class="visually-hidden">LLVM wyvern? Close enough.</span>
+            </details>
+          </div>
+          <p>
+            My main focus is GPU compiler and driver code. More broadly, I
+            work on compilers and operating systems.
+          </p>
+        </header>
+
+        <section>
+          <div class="section-label">
+            <h2>now</h2>
+            <div class="project-marks" aria-hidden="true">
+              <img
+                src="assets/images/mesa-logo.svg"
+                alt=""
+                width="28"
+                height="28"
+              >
+              <img
+                src="assets/images/llvm-dragon-legacy.png"
+                alt=""
+                width="28"
+                height="28"
+              >
+              <img
+                src="assets/images/tux.png"
+                alt=""
+                width="28"
+                height="28"
+              >
+            </div>
+          </div>
+          <div class="section-body">
+            <p>
+              Most days, I end up somewhere between Mesa, LLVM, Linux DRM, and
+              Wayland. I tend to follow whatever question has caught my
+              attention across the stack, and it is easy for me to lose track
+              of time while reading code, tracing behavior, or following an
+              idea all the way down to the hardware.
+            </p>
+            <p>
+              I’m looking for GPU compiler or driver work where that curiosity
+              is useful: understanding hardware deeply, reasoning about its
+              performance limits, and pushing real workloads closer to them.
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-label">
+            <h2>systems background</h2>
+            <div class="project-marks" aria-hidden="true">
+              <img
+                src="assets/images/u-boot-logo.svg"
+                alt=""
+                width="28"
+                height="28"
+              >
+              <img
+                src="assets/images/nuttx-logo.png"
+                alt=""
+                width="28"
+                height="28"
+              >
+            </div>
+          </div>
+          <div class="section-body">
+            <p>
+              My systems background includes NuttX bring-up on RK3588S and TI
+              AM67A. I upstreamed the initial Orange Pi 5 Pro port; at Baykar,
+              I brought up a Cortex-R5F through Linux remoteproc.
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-label">
+            <h2>background</h2>
+          </div>
+          <div class="section-body">
+            <p class="path-note">The short version: I kept opening black boxes one layer further down.</p>
+            <details class="path-details">
+              <summary>More</summary>
+              <div>
+                <p>
+                  Before I knew the terms debugger or reverse engineering, I
+                  modified small Visual Basic programs and used Cheat Engine to
+                  inspect game state. I also ran Minecraft servers, rooted
+                  phones, installed custom ROMs, and poked around router interfaces.
+                </p>
+                <p>
+                  I started writing code regularly in high school in 2017,
+                  making small games with friends, learning C# and Java, and
+                  taking part in Codeforces contests. I discovered Linux around
+                  2019, then moved into graphics programming in 2022, building
+                  small OpenGL and Vulkan renderers.
+                </p>
+                <p>
+                  Later, curiosity about how computers actually work drew me
+                  toward operating systems and computer architecture. Wanting
+                  to understand where performance comes from led me to
+                  compilers and microarchitecture.
+                </p>
+              </div>
+            </details>
+          </div>
+        </section>
+
+        <section>
+          <h2>contact</h2>
+          <div class="section-body contact-links">
+            <a href="mailto:emreleno@gmail.com">email</a>
+            <a href="https://github.com/emomaxd">github ↗</a>
+            <a href="https://gitlab.freedesktop.org/emomaxd">freedesktop ↗</a>
+            <a href="https://www.linkedin.com/in/emre-cecanpunar">linkedin ↗</a>
+            <a href="emre-cecanpunar-resume.pdf">cv</a>
+          </div>
+        </section>
+      </article>
+    </main>
+
+    <footer>
+      <p><a href="feed.xml">rss</a> · <a href="assets/THIRD_PARTY.md">art credits</a></p>
+      <p>updated <time datetime="2026-07-29">2026-07-29</time></p>
+    </footer>
+  </body>
+</html>
