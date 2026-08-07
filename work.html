@@ -31,83 +31,153 @@
     <main id="content">
       <header class="page-intro">
         <h1>Work</h1>
-        <p>Selected upstream patches, ports, and experiments.</p>
+        <p>Upstream work, ports, experiments, and projects.</p>
       </header>
 
-      <section class="work-group" aria-labelledby="compilers-drivers">
-        <h2 id="compilers-drivers">compilers and drivers</h2>
+      <section class="work-group" aria-labelledby="work">
+        <h2 id="work">upstream work</h2>
+
         <div class="work-list">
           <article>
-            <div class="work-meta"><span>mesa / compilers and drivers</span><strong>merged fixes</strong></div>
-            <h3>Mesa fixes</h3>
-            <p>Focused fixes in compiler allocation lifetime and driver compiler initialization.</p>
-            <p class="work-links"><a href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42950">Jay ↗</a><a href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43021">KosmicKrisp ↗</a></p>
+            <div class="work-meta">
+              <span>mesa / gpu compilers and drivers</span>
+            </div>
+
+            <h3>Mesa</h3>
+
+            <p>
+              Compiler and driver work across Intel, AMD, and related graphics
+              infrastructure.
+            </p>
+
+            <p class="work-links">
+              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/commits/main?author=emreleno@gmail.com">commits ↗</a>
+              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests?scope=all&state=all&author_username=emomaxd">merge requests ↗</a>
+                </p>
           </article>
+
           <article>
-            <div class="work-meta"><span>mesa / radv / aco</span><strong>prototype · not upstreamed</strong></div>
+            <div class="work-meta">
+              <span>linux / drm / platform</span>
+            </div>
+
+            <h3>Linux kernel</h3>
+
+            <p>
+              DRM and platform-driver work, including i915 and hp-wmi.
+            </p>
+
+            <p class="work-links">
+              <a href="https://lore.kernel.org/all/?q=emreleno@gmail.com">patches ↗</a>
+            </p>
+          </article>
+
+          <article>
+            <div class="work-meta">
+              <span>llvm / compiler infrastructure</span>
+            </div>
+
+            <h3>LLVM</h3>
+
+            <p>
+              Compiler and assembler contributions.
+            </p>
+
+            <p class="work-links">
+              <a href="https://github.com/llvm/llvm-project/pulls?q=author%3Aemomaxd">pull requests ↗</a>
+              <a href="posts/llvm-thumb-symbol-state.html">notes →</a>
+            </p>
+          </article>
+
+          <article>
+            <div class="work-meta">
+              <span>apache nuttx / arm64</span>
+            </div>
+
+            <h3>Apache NuttX</h3>
+
+            <p>
+              ARM64 platform bring-up and systems work, including the initial
+              RK3588S and Orange Pi 5 Pro port.
+            </p>
+
+            <p class="work-links">
+              <a href="https://github.com/apache/nuttx/pulls?q=author%3Aemomaxd">pull requests ↗</a>
+              <a href="https://github.com/apache/nuttx/pull/19489">RK3588S port ↗</a>
+              <a href="https://nuttx.apache.org/docs/latest/platforms/arm64/rk3588/boards/orangepi-5-pro/index.html">docs ↗</a>
+              <a href="posts/nuttx-rk3588s-bringup.html">notes →</a>
+            </p>
+          </article>
+
+          <article>
+            <div class="work-meta">
+              <span>wayland / nvidia</span>
+            </div>
+
+            <h3>Userspace graphics</h3>
+
+            <p>
+              Memory-safety and correctness fixes across Wayland and egl-wayland2.
+            </p>
+
+            <p class="work-links">
+              <a href="https://github.com/NVIDIA/egl-wayland2/pull/52">egl-wayland2 ↗</a>
+              <a href="https://gitlab.freedesktop.org/wayland/wayland/-/merge_requests/549">wayland ↗</a>
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="work-group" aria-labelledby="experiments">
+        <h2 id="experiments">experiments</h2>
+
+        <div class="work-list">
+          <article>
+            <div class="work-meta">
+              <span>mesa / radv / aco</span>
+            </div>
+
             <h3>Standalone ACO shader compilation</h3>
-            <p>Ran arbitrary SPIR-V through RADV and ACO with drm-shim and no physical AMD GPU.</p>
-            <p class="work-links"><a href="https://gitlab.freedesktop.org/mesa/mesa/-/issues/15111">discussion ↗</a><a href="posts/aco-standalone-tool.html">note →</a></p>
-          </article>
-          <article>
-            <div class="work-meta"><span>llvm / mc / arm</span><strong>open PR</strong></div>
-            <h3>Label-time state for Thumb function symbols</h3>
-            <p>Use the recorded ISA state from label emission instead of state at a later type directive.</p>
-            <p class="work-links"><a href="https://github.com/llvm/llvm-project/pull/211641">patch ↗</a><a href="posts/llvm-thumb-symbol-state.html">note →</a></p>
+
+            <p>
+              Ran arbitrary SPIR-V through RADV and ACO using drm-shim without a
+              physical AMD GPU.
+            </p>
+
+            <p class="work-links">
+              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/issues/15111">discussion ↗</a>
+              <a href="posts/aco-standalone-tool.html">note →</a>
+            </p>
           </article>
         </div>
       </section>
 
-      <section class="work-group" aria-labelledby="systems">
-        <h2 id="systems">systems</h2>
-        <div class="work-list">
-          <article>
-            <div class="work-meta"><span>apache nuttx / arm64</span><strong>merged</strong></div>
-            <h3>RK3588S and Orange Pi 5 Pro port</h3>
-            <p>Brought up the initial ARM64 port through U-Boot to NSH, including GICv3, timer, UART, and PSCI support.</p>
-            <p class="work-links"><a href="https://github.com/apache/nuttx/pull/19489">patch ↗</a><a href="posts/nuttx-rk3588s-bringup.html">note →</a><a href="https://nuttx.apache.org/docs/latest/platforms/arm64/rk3588/boards/orangepi-5-pro/index.html">docs ↗</a><a href="https://www.linkedin.com/feed/update/urn:li:share:7485040669955198976/">announcement ↗</a></p>
-          </article>
-          <article>
-            <div class="work-meta"><span>linux / drm / platform</span><strong>ongoing</strong></div>
-            <h3>Kernel and DRM fixes</h3>
-            <p>Worked on focused C fixes across hp-wmi and i915.</p>
-            <p class="work-links"><a href="https://lore.kernel.org/all/?q=emreleno@gmail.com">patches ↗</a></p>
-          </article>
-        </div>
-      </section>
+      <section class="work-group" aria-labelledby="projects">
+        <h2 id="projects">projects</h2>
 
-      <section class="work-group" aria-labelledby="other-work">
-        <h2 id="other-work">other upstream work</h2>
         <div class="work-list">
           <article>
-            <div class="work-meta"><span>wayland / memory safety</span><strong>merged / open MR</strong></div>
-            <h3>Userspace memory-safety fixes</h3>
-            <p>Merged an overflow fix in egl-wayland2 parsing and submitted a use-after-free fix for Wayland shared-memory buffer creation.</p>
-            <p class="work-links"><a href="https://github.com/NVIDIA/egl-wayland2/pull/52">egl-wayland2 ↗</a><a href="https://gitlab.freedesktop.org/wayland/wayland/-/merge_requests/549">Wayland ↗</a></p>
-          </article>
-          <article>
-            <div class="work-meta"><span>project / linux</span><strong>active</strong></div>
+            <div class="work-meta">
+              <span>linux / hardware control</span>
+            </div>
+
             <h3>hpfand</h3>
-            <p>A fail-safe fan-control daemon for HP Victus and Omen laptops.</p>
-            <p class="work-links"><a href="https://github.com/emomaxd/hpfand">source ↗</a></p>
-          </article>
-        </div>
-      </section>
 
-      <section class="work-group" aria-labelledby="upstream-activity">
-        <h2 id="upstream-activity">upstream activity</h2>
-        <div class="activity-links">
-          <a href="https://gitlab.freedesktop.org/mesa/mesa/-/commits/main?author=emreleno@gmail.com">mesa commits ↗</a>
-          <a href="https://lore.kernel.org/all/?q=emreleno@gmail.com">linux patches ↗</a>
-          <a href="https://github.com/llvm/llvm-project/pulls?q=author%3Aemomaxd">llvm PRs ↗</a>
-          <a href="https://github.com/apache/nuttx/pulls?q=author%3Aemomaxd">nuttx PRs ↗</a>
+            <p>
+              A fail-safe fan-control daemon for HP Victus and Omen laptops.
+            </p>
+
+            <p class="work-links">
+              <a href="https://github.com/emomaxd/hpfand">source ↗</a>
+            </p>
+          </article>
         </div>
       </section>
     </main>
 
     <footer>
       <p><a href="feed.xml">rss</a></p>
-      <p>updated <time datetime="2026-07-26">2026-07-26</time></p>
+      <p>updated <time datetime="2026-08-07">2026-08-07</time></p>
     </footer>
   </body>
 </html>
