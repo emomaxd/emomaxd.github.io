@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Selected upstream work by Emre Cecanpunar in GPU compilers, graphics drivers, Linux, LLVM, and Apache NuttX.">
+    <meta name="author" content="Emre Cecanpunar">
+    <meta name="theme-color" content="#ffffff">
+    <meta property="og:title" content="work — emomaxd">
+    <meta property="og:description" content="Selected work in GPU compilers, graphics drivers, and low-level systems.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://emomaxd.github.io/work.html">
+    <link rel="canonical" href="https://emomaxd.github.io/work.html">
+    <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="feed.xml">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="style.css">
+    <title>work — emomaxd</title>
+  </head>
+  <body class="work-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <header class="site-header">
+      <a class="identity" href="index.html">emomaxd</a>
+      <nav aria-label="Primary navigation">
+        <a href="notes.html">notes</a>
+        <a aria-current="page" href="work.html">work</a>
+        <a href="about.html">about</a>
+        <a href="emre-cecanpunar-resume.pdf">cv</a>
+      </nav>
+    </header>
+
+    <main id="content">
+      <header class="page-intro">
+        <h1>Work</h1>
+        <p>Upstream work, ports, experiments, and projects.</p>
+      </header>
+
+      <section class="work-group" aria-labelledby="work">
+        <h2 id="work">upstream work</h2>
+
+        <div class="work-list">
+          <article>
+            <div class="work-meta">
+              <span>mesa / gpu compilers and drivers</span>
+            </div>
+
+            <h3>Mesa</h3>
+
+            <p>
+              Compiler and driver patches across Intel, AMD, and shared
+              graphics infrastructure.
+            </p>
+
+            <p class="work-links">
+              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/commits/main?author=emreleno@gmail.com">commits ↗</a>
+              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests?scope=all&state=all&author_username=emomaxd">merge requests ↗</a>
+                </p>
+          </article>
+
+          <article>
+            <div class="work-meta">
+              <span>linux / drm / platform</span>
+            </div>
+
+            <h3>Linux kernel</h3>
+
+            <p>
+              DRM and platform-driver work, including i915 and hp-wmi.
+            </p>
+
+            <p class="work-links">
+              <a href="https://lore.kernel.org/all/?q=emreleno@gmail.com">patches ↗</a>
+            </p>
+          </article>
+
+          <article>
+            <div class="work-meta">
+              <span>llvm / compiler infrastructure</span>
+            </div>
+
+            <h3>LLVM</h3>
+
+            <p>
+              Compiler and MC-layer fixes, including Arm/Thumb symbol handling.
+            </p>
+
+            <p class="work-links">
+              <a href="https://github.com/llvm/llvm-project/pulls?q=author%3Aemomaxd">pull requests ↗</a>
+              <a href="posts/llvm-thumb-symbol-state.html">notes →</a>
+            </p>
+          </article>
+
+          <article>
+            <div class="work-meta">
+              <span>apache nuttx / arm64</span>
+            </div>
+
+            <h3>Apache NuttX</h3>
+
+            <p>
+              ARM64 platform bring-up and systems work, including the initial
+              RK3588S and Orange Pi 5 Pro port.
+            </p>
+
+            <p class="work-links">
+              <a href="https://github.com/apache/nuttx/pulls?q=author%3Aemomaxd">pull requests ↗</a>
+              <a href="https://github.com/apache/nuttx/pull/19489">RK3588S port ↗</a>
+              <a href="https://nuttx.apache.org/docs/latest/platforms/arm64/rk3588/boards/orangepi-5-pro/index.html">docs ↗</a>
+              <a href="posts/nuttx-rk3588s-bringup.html">notes →</a>
+            </p>
+          </article>
+
+          <article>
+            <div class="work-meta">
+              <span>wayland / nvidia</span>
+            </div>
+
+            <h3>Userspace graphics</h3>
+
+            <p>
+              Memory-safety and correctness fixes across Wayland and egl-wayland2.
+            </p>
+
+            <p class="work-links">
+              <a href="https://github.com/NVIDIA/egl-wayland2/pull/52">egl-wayland2 ↗</a>
+              <a href="https://gitlab.freedesktop.org/wayland/wayland/-/merge_requests/549">wayland ↗</a>
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="work-group" aria-labelledby="experiments">
+        <h2 id="experiments">experiments</h2>
+
+        <div class="work-list">
+          <article>
+            <div class="work-meta">
+              <span>mesa / radv / aco</span>
+            </div>
+
+            <h3>Standalone ACO shader compilation</h3>
+
+            <p>
+              Ran arbitrary SPIR-V through RADV and ACO using drm-shim without a
+              physical AMD GPU.
+            </p>
+
+            <p class="work-links">
+              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/issues/15111">discussion ↗</a>
+              <a href="posts/aco-standalone-tool.html">note →</a>
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="work-group" aria-labelledby="projects">
+        <h2 id="projects">projects</h2>
+
+        <div class="work-list">
+          <article>
+            <div class="work-meta">
+              <span>linux / hardware control</span>
+            </div>
+
+            <h3>hpfand</h3>
+
+            <p>
+              A fail-safe fan-control daemon for HP Victus and Omen laptops.
+            </p>
+
+            <p class="work-links">
+              <a href="https://github.com/emomaxd/hpfand">source ↗</a>
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p><a href="feed.xml">rss</a></p>
+      <p>updated <time datetime="2026-08-18">2026-08-18</time></p>
+    </footer>
+  </body>
+</html>

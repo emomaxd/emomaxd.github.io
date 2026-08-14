@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://emomaxd.github.io/sitemap.xml
+Sitemap: https://emomaxd.github.io/sitemap.txt
