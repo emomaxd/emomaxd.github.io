@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="How I used ptxas, nvdisasm, NAK tests, and an AD107 to work through signed saturating addition and PLOP3 .SIGN encoding.">
+  <meta name="theme-color" content="#ffffff">
+  <meta property="og:title" content="A signed saturating add through NAK — emomaxd">
+  <meta property="og:description" content="From a CUDA compiler example to PLOP3 .SIGN encodings, truth tables, and an unfinished NAK patch.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://emomaxd.github.io/posts/nak-iadd-sat.html">
+  <link rel="canonical" href="https://emomaxd.github.io/posts/nak-iadd-sat.html">
+  <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="../feed.xml">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+  <title>A signed saturating add through NAK — emomaxd</title>
+</head>
+<body class="article-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header"><a class="identity" href="../index.html">emomaxd</a><nav aria-label="Primary navigation"><a aria-current="page" href="../notes.html">notes</a><a href="../work.html">work</a><a href="../about.html">about</a></nav></header>
+  <main id="content">
+    <article>
+      <header class="article-header">
+        <h1>A signed saturating add through NAK</h1>
+        <div class="article-meta"><time datetime="2026-08-24">2026-08-24</time><span>area: mesa / nak / nvk</span><span>status: local WIP</span><span>tested: AD107 / nvdisasm / Vulkan CTS</span></div>
+      </header>
+      <div class="article-body">
+        <p>This was my first time probing an instruction encoding instead of only reading an existing encoder. I did not discover the five-instruction sequence: Faith Ekstrand had already put CUDA's output in the <a href="https://gitlab.freedesktop.org/mesa/mesa/-/work_items/14153">work item</a>. My part started where the issue stopped: making NAK represent <code>PLOP3</code> sign-bit sources, emit the observed encoding, and survive real compiler paths.</p>
+
+        <p>The names used below:</p>
+        <pre><code>PTX    NVIDIA's portable assembly language
+SASS   the machine instructions executed by an NVIDIA GPU
+NIR    Mesa's shared compiler intermediate representation
+NAK    Mesa's NVIDIA shader backend: NIR → SASS
+GPR    a 32-bit general-purpose register, one value per GPU lane
+Pred   a one-bit predicate register used for conditions</code></pre>
+
+        <h2 id="starting-point">The part that was already known</h2>
+        <p>The issue contained this SASS:</p>
+        <pre><code>IADD3 R0, R2, R5, RZ
+PLOP3.LUT P0, PT, R5.SIGN, R2.SIGN, R0.SIGN, 0x2,  0x0
+PLOP3.LUT P1, PT, R5.SIGN, R2.SIGN, R0.SIGN, 0x40, 0x0
+SEL R9, R0, 0x7fffffff, !P0
+SEL R9, R9, 0x80000000, !P1</code></pre>
+        <p>That answered “what does NVIDIA's compiler select?” It did not answer how NAK should type those sources, which SM70 encoding form to use, or what legalization and uniformization may do to them.</p>
+
+        <h2 id="boundary">Where the operation disappeared</h2>
+        <p>NIR already had <code>nir_op_iadd_sat</code>. NAK requested generic lowering unconditionally:</p>
+        <pre><code>lower_uadd_sat: dev.sm &lt; 70,
+lower_usub_sat: dev.sm &lt; 70,
+lower_iadd_sat: true, // TODO</code></pre>
+        <p>So this was not a missing-correctness bug. NIR expanded the operation before NAK saw it. The native path required changing that option for SM70+, adding the NIR translation, building the sequence, and carrying the new source form through NAK IR to the encoder.</p>
+
+        <h2 id="lut">Why the LUTs are 0x02 and 0x40</h2>
+        <p>There is no single signed <code>IADD.SAT</code> instruction here. Start with a wrapping sum. Signed addition overflows only when both inputs have the same sign and the wrapped result has the opposite sign:</p>
+        <pre><code>x.sign  y.sign  sum.sign  result
+   0       0        1     positive overflow → INT_MAX
+   1       1        0     negative overflow → INT_MIN</code></pre>
+        <p><code>PLOP3</code> is a three-input boolean lookup table. Its LUT byte has one bit for each of the eight input rows. With NAK's <code>(x, y, sum)</code> ordering, <code>001</code> is bit 1, hence <code>1 &lt;&lt; 1 = 0x02</code>. The row <code>110</code> is bit 6, hence <code>1 &lt;&lt; 6 = 0x40</code>.</p>
+        <pre><code>sum          = IADD3(x, y, 0)
+pos_overflow = PLOP3(x.sign, y.sign, sum.sign, LUT=0x02)
+neg_overflow = PLOP3(x.sign, y.sign, sum.sign, LUT=0x40)
+tmp          = SEL(pos_overflow, INT_MAX, sum)
+dst          = SEL(neg_overflow, INT_MIN, tmp)</code></pre>
+
+        <h2 id="cuda-oracle">Asking CUDA for the machine code</h2>
+        <p>The sequence from the issue can be produced from a small SM89 PTX kernel containing one <code>add.sat.s32</code>:</p>
+        <pre><code>.version 8.8
+.target sm_89
+.address_size 64
+
+.visible .entry test_iadd_sat(
+    .param .u64 out_ptr,
+    .param .u64 in_ptr)
+{
+    .reg .b64 %rd&lt;4&gt;;
+    .reg .s32 %r&lt;4&gt;;
+
+    ld.param.u64 %rd1, [out_ptr];
+    ld.param.u64 %rd2, [in_ptr];
+    add.u64 %rd3, %rd2, 4;
+    ld.global.s32 %r1, [%rd2];
+    ld.global.s32 %r2, [%rd3];
+    add.sat.s32 %r3, %r1, %r2;
+    st.global.u32 [%rd1], %r3;
+    ret;
+}</code></pre>
+        <p>The corresponding <code>ptxas</code> and <code>nvdisasm</code> commands are:</p>
+        <pre><code>ptxas -arch=sm_89 iadd_sat.ptx -o iadd_sat.cubin
+nvdisasm --print-code --print-instruction-encoding iadd_sat.cubin |
+  rg 'IADD3|PLOP3|SEL'</code></pre>
+        <p>The relevant output was the same five-instruction core shown in the issue:</p>
+        <pre><code>IADD3 R2, R0, R3, RZ
+PLOP3.LUT P0, PT, R0.SIGN, R3.SIGN, R2.SIGN, 0x2,  0x0
+PLOP3.LUT P1, PT, R0.SIGN, R3.SIGN, R2.SIGN, 0x40, 0x0
+SEL R7, R2, 0x7fffffff, !P0
+SEL R7, R7, 0x80000000, !P1</code></pre>
+        <p><code>ptxas</code> gave me NVIDIA's instruction selection. <code>nvdisasm</code> printed both the readable SASS and each 128-bit instruction encoding. I did not try to reverse every bit of <code>PLOP3</code>. NAK already knew the ordinary predicate form, common ALU register fields, LUT field, and predicate destinations. I compared that known encoder with the all-<code>.SIGN</code> instruction emitted by CUDA and added the missing GPR-source form.</p>
+        <p>The first encoder version reused NAK's common three-source ALU encoding and filled only the fields established by the comparison:</p>
+        <pre><code>127                                                   0
+┌──────────────┬──────┬──────┬──────────┬─────────────┐
+│ common ALU,  │ dst1 │ dst0 │ LUT      │ opcode/form │
+│ source and   │84–86 │81–83 │72–79     │0–11         │
+│ control bits │      │      │          │             │
+└──────────────┴──────┴──────┴──────────┴─────────────┘</code></pre>
+        <pre><code>e.encode_alu(0x01f, None,
+             Some(&amp;self.srcs[0]),
+             Some(&amp;self.srcs[1]),
+             Some(&amp;self.srcs[2]));
+e.set_field(72..80, self.ops[0].lut);
+e.set_pred_dst(81..84, &amp;self.dsts[0]);
+e.set_pred_dst(84..87, &amp;self.dsts[1]);</code></pre>
+        <p>The diagram is an overlay of the fields this code writes, not a claim that I recovered the full 128-bit format.</p>
+        <p>I then made NAK's disassembly test encode the IR and ask NVIDIA's decoder for the expected text:</p>
+        <pre><code>export NAK_TEST=/path/to/mesa-build/src/nouveau/compiler/nak
+
+PATH=/path/to/cuda/bin:$PATH \
+  "$NAK_TEST" \
+  --test --exact nvdisasm_tests::test_plop3 --test-threads 1</code></pre>
+        <p>This proves that NVIDIA's decoder agrees with the fields NAK emitted. It does not prove that the instruction computes the right value. For that I needed the GPU.</p>
+
+        <h2 id="first-model">My first model was deliberately narrow</h2>
+        <p>Before reading Máté Pinczel's commits or the later discussion, I modeled <code>.SIGN</code> as one instruction-wide mode: either all three <code>PLOP3</code> sources were predicates or all three were GPR sign bits. That was enough for <code>iadd_sat</code>, where both LUTs use <code>x.sign</code>, <code>y.sign</code>, and <code>sum.sign</code>.</p>
+        <p>The patch connected the whole vertical slice:</p>
+        <pre><code>NIR iadd_sat
+  → NAK builder: IADD3 + two PLOP3 + two SEL
+  → OpPLop3 with sign-mode GPR sources
+  → legalization
+  → SM70+ encoding
+  → AD107</code></pre>
+        <p>The local hardware test stores the GPU result and compares it with Rust's <code>saturating_add</code> for boundary inputs and 100 deterministic random pairs:</p>
+        <pre><code>PATH=/path/to/cuda/bin:$PATH \
+  "$NAK_TEST" \
+  --test --exact hw_tests::test_iadd_sat --test-threads 1</code></pre>
+
+        <h2 id="failure">The useful failure</h2>
+        <p>The focused hardware and disassembly tests passed. I then ran the Vulkan Conformance Test Suite (CTS) dot-accumulate-saturate cases. These are not named <code>iadd_sat</code> tests, but NIR lowers a signed saturating dot product to a normal dot product followed by <code>iadd_sat</code> with the accumulator. That made them a wider test of the new path.</p>
+        <pre><code>844 pass
+152 fail
+failure: NAK assertion during pipeline compilation</code></pre>
+        <p>A normal GPR holds a separate value for each GPU lane. A uniform register holds one value shared by every lane. Some CTS variants used values that NAK could move into uniform registers, and NAK considered every <code>PLOP3</code> uniform-capable. My new <code>.SIGN</code> encoding supported only normal GPR sources. The compiler therefore reached an unsupported uniform form and stopped at the encoder assertion; the GPU never ran a wrong result.</p>
+        <p>I kept the assertion. The fix belonged earlier: sign-source <code>PLOP3</code> is non-uniform, non-register inputs must be copied into GPRs, and predicate optimizations must not treat its ALU sources as ordinary predicates. After that, the full filter covered signed, unsigned, and mixed-signedness dot-accumulate-saturate cases:</p>
+        <pre><code>// Ordinary predicate PLOP3 may be uniform; .SIGN PLOP3 may not.
+Op::PLop3(op) =&gt; !op.src_sign,
+
+// The encoder's .SIGN form consumes normal GPRs.
+if self.src_sign {
+    for src in &amp;mut self.srcs {
+        b.copy_alu_src_if_not_reg(src, RegFile::GPR, SrcType::GPR);
+    }
+}</code></pre>
+        <pre><code>uniform value
+    → copy to a normal GPR in each lane
+    → warp PLOP3 R?.SIGN, R?.SIGN, R?.SIGN</code></pre>
+        <pre><code>export MESA_PREFIX=/path/to/patched-mesa-install
+export VK_CTS=/path/to/VK-GL-CTS/build/external/vulkancts/modules/vulkan/deqp-vk
+
+env VK_DRIVER_FILES="$MESA_PREFIX/share/vulkan/icd.d/nouveau_icd.x86_64.json" \
+  LD_LIBRARY_PATH="$MESA_PREFIX/lib" \
+  MESA_SHADER_CACHE_DISABLE=true \
+  "$VK_CTS" -n \
+  'dEQP-VK.spirv_assembly.instruction.compute.op*dotaccsatkhr.*' \
+  --deqp-log-filename=iadd_sat.qpa \
+  --deqp-log-images=disable</code></pre>
+        <pre><code>Passed: 996/996
+Failed: 0</code></pre>
+
+        <h2 id="other-work">Then I found the broader model</h2>
+        <p>In the issue I wrote explicitly that my all-<code>.SIGN</code> implementation predated the comment and Máté's commits. Faith's proposed direction was to make <code>.SIGN</code> a source modifier, assuming <code>PLOP3</code> supports arbitrary mixtures of <code>rN.sign</code> and predicates. Máté's WIP already modeled that per source and included mixed-source <code>nvdisasm</code> coverage. I built his commit locally; that test passed with CUDA 13.3.73.</p>
+        <p>That changed the IR question. With <code>P</code> for a predicate source and <code>S</code> for a register sign bit, three sources have eight logical layouts:</p>
+        <pre><code>PPP  PPS  PSP  PSS  SPP  SPS  SSP  SSS</code></pre>
+        <p>I did not assume there must be eight physical encodings. I took a known SM89 <code>PLOP3</code> binary, varied all 4,096 values of its 12-bit opcode field, and ran every candidate through CUDA 13.3 <code>nvdisasm</code>. The decoder exposed these relevant forms:</p>
+        <pre><code>0x81c        PPP: predicate-only PLOP3
+0x21d        PSP: one .SIGN source
+0x21e        PSS: two .SIGN sources
+0x21f        SSS: three .SIGN sources
+0xa1d–0xa1f  constant-buffer source variants
+0x89c        uniform UPLOP3</code></pre>
+        <p>This was automated, not a visual search through 4,096 binary strings. The scanner kept the other 116 bits of a known instruction fixed, replaced bits 0–11 with each candidate, wrote the four 32-bit words to a temporary file, and retained outputs containing <code>PLOP3</code>:</p>
+        <pre><code>let base = [0x0200721f_u32, 0x00000003,
+            0x00700204,     0x000fc000];
+
+for opcode in 0_u32..0x1000 {
+    let code = [
+        (base[0] &amp; !0xfff) | opcode,
+        base[1], base[2], base[3],
+    ];
+    // Write code as little-endian bytes, then:
+    nvdisasm -b SM89 --print-raw candidate.bin
+}</code></pre>
+        <p>For example, the controlled template changes like this:</p>
+        <pre><code>logical form   four 32-bit words                         low 12 bits
+PPP            0200781c 00000003 00700204 000fc000       0x81c
+SSS            0200721f 00000003 00700204 000fc000       0x21f
+                       ^ the scanned field is here</code></pre>
+        <p>The word comparison tells me which controlled field changed. <code>nvdisasm</code> tells me how NVIDIA's decoder interprets that candidate. Neither alone proves execution semantics, which is why I followed the scan with the AD107 truth-table test.</p>
+        <p>That opcode-field scan exposed no separate decoded form for <code>PPS</code>, <code>SPP</code>, <code>SPS</code>, or <code>SSP</code>. The useful model is four canonical physical layouts. Legalization can reorder a logical layout into one of them, but it must permute the LUT inputs at the same time. Swapping sources without swapping the LUT axes silently changes the boolean function.</p>
+        <p>For a concrete reorder, suppose the logical operation is <code>SPP(a, b, c, lut)</code>: <code>a</code> is a GPR sign bit, while <code>b</code> and <code>c</code> are predicates. The hardware form puts the one sign source in the middle slot:</p>
+        <pre><code>logical:   SPP(a, b, c, lut)
+physical: PSP(b, a, c, permute_xy(lut))</code></pre>
+        <p>Only swapping <code>a</code> and <code>b</code> would make LUT input <code>x</code> receive the old <code>y</code>. Applying the same permutation to the LUT preserves all eight rows of the original boolean function.</p>
+
+        <h2 id="mixed-test">Checking all eight logical layouts</h2>
+        <p>I added an AD107 truth-table test. It uses <code>0</code> and <code>INT_MIN</code>, so one boolean can be supplied either as <code>value != 0</code> through a predicate or as <code>value.sign</code> through a GPR. For every P/S layout, it runs all eight input rows with two asymmetric LUTs, <code>0x1b</code> and <code>0xe4</code>. These are test functions, not the <code>0x02</code> and <code>0x40</code> overflow LUTs above; their asymmetry makes a bad source order or LUT permutation visible.</p>
+        <pre><code>8 source layouts × 8 truth-table rows × 2 LUTs = 128 result checks</code></pre>
+        <p>All eight logical layouts pass after source canonicalization and the matching LUT permutation. This is the part that convinced me the per-source modifier model is better than my original instruction-wide flag.</p>
+        <p>I also tried to make <code>ptxas</code> select mixed-source <code>PLOP3</code> directly. Schematically, I asked for a boolean function combining one sign test with predicates that already represented boolean conditions:</p>
+        <pre><code>sx = (x &lt; 0)
+out = LUT(sx, p, q)</code></pre>
+        <p><code>ptxas</code> folded straightforward versions into <code>ISETP</code> instead of emitting a mixed <code>PLOP3</code>. I then used PTX <code>vote</code> operations to stop the predicates from being trivially folded. That produced a <code>PLOP3</code>, but <code>ptxas</code> first materialized <code>sx</code> as a predicate, so all three final sources were predicates:</p>
+        <pre><code>sign test + predicate logic  → ISETP
+opaque predicates via vote  → predicate materialization → PPP PLOP3</code></pre>
+        <p>These are schematic versions of the probes; I did not preserve the exact mixed-probe PTX files. The result only describes CUDA's instruction selection for those inputs. It does not disprove mixed encodings; the decoder scan and hardware test answer that question more directly.</p>
+
+        <h2 id="results">Results and limits</h2>
+        <p>The narrow native <code>iadd_sat</code> path passes its AD107 hardware test, external disassembly test, and 996 CTS cases. A corpus of 110 Fossilize databases and 1,334 comparable shader executables produced no output changes because none contained a surviving <code>nir_op_iadd_sat</code>. That is corpus coverage, not a performance result.</p>
+        <p>The broader mixed-source branch is still research code. Its focused truth-table test passes, but the full NAK run is not green: 60 tests pass and two fail, including modifier legalization in Máté's original <code>iadd_sat</code> test and an existing <code>plop2</code> path. The opcode scanner and debug printing also do not belong in an MR.</p>
+        <p class="note">I have not opened an MR. I posted the evidence on the work item and asked whether the Vulkan accelerated properties belong in the same series, how maintainers want the commits split, and whether the per-source model matches the intended direction. The code remains local while I wait for that direction.</p>
+
+        <h2 id="references">References</h2>
+        <ul>
+          <li><a href="https://gitlab.freedesktop.org/mesa/mesa/-/work_items/14153">Mesa work item #14153</a> — original CUDA sequence, LUT values, Vulkan property scope, and follow-up discussion.</li>
+          <li><a href="https://docs.mesa3d.org/nir/index.html">Mesa NIR documentation</a> — the shared IR in which <code>nir_op_iadd_sat</code> lives.</li>
+          <li><a href="https://docs.nvidia.com/cuda/parallel-thread-execution/#integer-arithmetic-instructions-add">PTX integer <code>add</code></a> — semantics of <code>add.sat.s32</code>.</li>
+          <li><a href="https://docs.nvidia.com/cuda/cuda-binary-utilities/">CUDA Binary Utilities</a> — <code>nvdisasm</code> usage and instruction-encoding output.</li>
+          <li><a href="https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html">SPIR-V specification</a> — signed, unsigned, and mixed-signedness dot-accumulate-saturate operations exercised by CTS.</li>
+        </ul>
+      </div>
+    </article>
+    <nav class="article-nav" aria-label="Article navigation"><a href="../notes.html">← All notes</a><a href="brw-scoreboard-register-file.html">BRW scoreboard →</a></nav>
+  </main>
+  <footer><p><a href="../feed.xml">rss</a></p><p>updated <time datetime="2026-08-26">2026-08-26</time></p></footer>
+</body>
+</html>

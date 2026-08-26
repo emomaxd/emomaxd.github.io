@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Sizing BRW scoreboard state to the hardware register file and measuring the result with shader-db.">
+  <meta name="theme-color" content="#ffffff">
+  <meta property="og:title" content="Sizing BRW's scoreboard to the register file — emomaxd">
+  <meta property="og:description" content="Sizing BRW scoreboard state to the hardware register file and measuring the result with shader-db.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://emomaxd.github.io/posts/brw-scoreboard-register-file.html">
+  <link rel="canonical" href="https://emomaxd.github.io/posts/brw-scoreboard-register-file.html">
+  <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="../feed.xml">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+  <title>Sizing BRW's scoreboard to the register file — emomaxd</title>
+</head>
+<body class="article-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header"><a class="identity" href="../index.html">emomaxd</a><nav aria-label="Primary navigation"><a aria-current="page" href="../notes.html">notes</a><a href="../work.html">work</a><a href="../about.html">about</a></nav></header>
+  <main id="content">
+    <article>
+      <header class="article-header">
+        <h1>Sizing BRW's scoreboard to the register file</h1>
+        <div class="article-meta"><time datetime="2026-08-24">2026-08-24</time><span>area: mesa / brw / performance</span><span>status: open MR</span><span>tested: RPL-S / shader-db</span></div>
+      </header>
+      <div class="article-body">
+        <p>BRW's scoreboard reserved and visited 512 GRF dependency entries on every supported generation. Xe3 needs all 512. My RPL-S system can address 128.</p>
+
+        <h2 id="profile">The profile</h2>
+        <p>A full shader-db profile put <code>propagate_block_scoreboards()</code> at 5.10% of P-core cycles and 5.93% of E-core cycles. Its merge, shadow, transport, and equality operations walked the full array.</p>
+        <pre><code>Gfx12 / Gfx12.5   128 × 32-byte GRF units
+Xe2               256 × 32-byte GRF units
+Xe3               512 × 32-byte GRF units</code></pre>
+        <p>On Gfx12, each traversal carried 384 impossible entries. Per-block delta, input, and output scoreboard arrays carried the same unused state.</p>
+
+        <h2 id="change">Three fixed sizes</h2>
+        <p>The candidate makes the GRF count a template parameter and selects one specialization when dependency gathering begins:</p>
+        <pre><code>ver &gt;= 30  → scoreboard&lt;512&gt;
+ver &gt;= 20  → scoreboard&lt;256&gt;
+otherwise  → scoreboard&lt;128&gt;</code></pre>
+        <p>The dependency algorithm does not change. Existing loops already use the array size, so reducing the representation removes both traversal and storage. A boundary test touches the last addressable register unit on Gfx12, Xe2, and Xe3.</p>
+
+        <h2 id="numbers">Paired shader-db runs</h2>
+        <p>I ran five paired full-corpus comparisons at <code>-j20</code> on an RPL-S Iris system.</p>
+        <pre><code>                         main       candidate    change
+task-clock           85194.39 ms   79949.94 ms   -6.16%
+P-core cycles          302.77 G      285.30 G    -5.77%
+E-core cycles          240.35 G      224.93 G    -6.42%</code></pre>
+        <p>The hotspot fell to 1.42% of P-core cycles and 1.60% of E-core cycles. A five-run single-thread subset used 3.80% less task-clock. All 26,884 stable full shader-db output lines were identical in every pair.</p>
+
+        <h2 id="tradeoff">The code-size tradeoff</h2>
+        <p>Three template specializations add 47,462 bytes to <code>libgallium</code> text, or 0.14%. I also tried a runtime-sized contiguous arena. It removed the text increase but touched about 2.4 times as many diff lines and was 0.23% slower than the template candidate in the full runs.</p>
+        <p>The arena saved text, but not time. It also made the patch about 2.4 times larger, so I kept the template version.</p>
+
+        <h2 id="checks">Checks and scope</h2>
+        <p>The configured Mesa suite passed 106/106. A normal build passed all 294 BRW compiler tests, and the 44 scoped scoreboard tests passed under ASan and UBSan. The dynamic export list and SONAME were unchanged.</p>
+        <p>The timing measurements are from RPL-S. Xe2 and Xe3 are covered by generation-boundary tests, not hardware benchmarks.</p>
+        <p class="note">The patch is open as <a href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43396">Mesa MR !43396</a> at commit <code>3306a9e6ae7</code>. It is not merged.</p>
+      </div>
+    </article>
+    <nav class="article-nav" aria-label="Article navigation"><a href="nak-iadd-sat.html">← NAK iadd_sat</a><a href="../notes.html">All notes →</a></nav>
+  </main>
+  <footer><p><a href="../feed.xml">rss</a></p><p>updated <time datetime="2026-08-26">2026-08-26</time></p></footer>
+</body>
+</html>

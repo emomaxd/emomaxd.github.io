@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The Mesa build and debug loop I use: small builds, verified driver loading, source search, sanitizers, and bisecting.">
+  <meta name="theme-color" content="#ffffff">
+  <meta property="og:title" content="My Mesa build and debug loop — emomaxd">
+  <meta property="og:description" content="The Mesa build and debug loop I use: small builds, verified driver loading, source search, sanitizers, and bisecting.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://emomaxd.github.io/posts/getting-started-mesa.html">
+  <link rel="canonical" href="https://emomaxd.github.io/posts/getting-started-mesa.html">
+  <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="../feed.xml">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+  <title>My Mesa build and debug loop — emomaxd</title>
+</head>
+<body class="article-page">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <header class="site-header"><a class="identity" href="../index.html">emomaxd</a><nav aria-label="Primary navigation"><a aria-current="page" href="../notes.html">notes</a><a href="../work.html">work</a><a href="../about.html">about</a></nav></header>
+  <main id="content">
+    <article>
+      <header class="article-header">
+        <h1>My Mesa build and debug loop</h1>
+        <div class="article-meta"><time datetime="2026-01-13">2026-01-13</time><span>area: mesa</span><span>status: reference</span></div>
+      </header>
+      <div class="article-body">
+        <p>This is the loop I assembled while working on BRW, Jay, NAK, and driver-side experiments. It is not a general Mesa installation guide. The point is to know which checkout produced a result, which driver was loaded, and what each test can actually establish.</p>
+
+        <h2 id="build">Build directories</h2>
+        <p>A plain setup leaves driver lists on <code>auto</code>:</p>
+        <pre><code>meson setup build -Dbuildtype=debug
+ninja -C build</code></pre>
+        <p><code>meson configure build</code> shows the result afterwards. Once I know the API and driver, I use a narrower build directory:</p>
+        <pre><code>meson setup build-intel -Dbuildtype=debug \
+  -Dvulkan-drivers=intel \
+  -Dgallium-drivers=iris \
+  -Dtools=intel,drm-shim
+
+meson setup build-mali -Dbuildtype=debug \
+  -Dvulkan-drivers=panfrost -Dgallium-drivers=panfrost
+
+ninja -C build-intel
+ninja -C build-mali</code></pre>
+        <p>The Intel build contains ANV, Iris and the shared Intel compiler, including BRW and Jay. <code>tools=intel</code> brings the Intel tools directory into the build; <code>drm-shim</code> enables its fake-device support. Both are needed for <code>intel_stub_gpu</code>.</p>
+        <p>I keep broad and driver-specific builds separate.</p>
+
+        <h2 id="incremental">Ninja targets</h2>
+        <p><code>ninja -C build</code> is incremental. Naming a target is still useful when the build contains unrelated tools or drivers.</p>
+        <pre><code>ninja -C build -t targets all | rg 'libnir|libvulkan'
+ninja -C build src/compiler/nir/libnir.a.p/nir.c.o</code></pre>
+        <p>Object paths depend on the Meson target, so I take them from <code>-t targets all</code> instead of guessing.</p>
+        <p>These commands help inspect the work:</p>
+        <pre><code>ninja -C build -n &lt;target&gt;
+ninja -C build -t commands &lt;target&gt;
+ninja -C build -v &lt;target&gt;</code></pre>
+        <p><code>-t commands</code> prints the exact flags for a target.</p>
+
+        <h2 id="local">Using the local build</h2>
+        <p>Mesa's documented easy path is <a href="https://docs.mesa3d.org/install.html">Meson's development environment</a>:</p>
+        <pre><code>meson devenv -C build vulkaninfo
+meson devenv -C build glxinfo -B</code></pre>
+        <p>It sets <code>VK_DRIVER_FILES</code> and adds the build's driver directories to <code>LD_LIBRARY_PATH</code>. Relative paths are resolved from the build directory.</p>
+        <p>The same environment can initialize ANV as a PTL device without PTL hardware:</p>
+        <pre><code>meson devenv -C build-intel \
+  intel_stub_gpu -p ptl -- vulkaninfo --summary</code></pre>
+        <p><code>meson devenv</code> supplies both <code>intel_stub_gpu</code> on <code>PATH</code> and the generated Intel ICD through <code>VK_DRIVER_FILES</code>. The stub is a compiler and driver-initialization tool. It does not execute shaders.</p>
+        <p>For manual control, install into a disposable prefix:</p>
+        <pre><code>export MESA_INSTALLDIR="$PWD/install"
+meson setup build-install -Dprefix="$MESA_INSTALLDIR" &lt;other options&gt;
+meson install -C build-install
+
+VK_DRIVER_FILES="$MESA_INSTALLDIR/share/vulkan/icd.d/&lt;driver&gt;_icd.x86_64.json" vulkaninfo
+LD_LIBRARY_PATH="$MESA_INSTALLDIR/lib64" glxinfo -B</code></pre>
+        <p>The library directory may be <code>lib</code> rather than <code>lib64</code>. I check the selected implementation in <code>vulkaninfo</code> or <code>glxinfo -B</code>.</p>
+        <p><code>DRI_PRIME_DEBUG=1</code> explains device selection. <code>DRI_PRIME</code> picks another device. <code>MESA_LOADER_DRIVER_OVERRIDE</code> is only for debugging.</p>
+
+        <h2 id="corpora">Shader corpora</h2>
+        <p>Shader-db contains two related workflows. Its <code>run</code> binary feeds captured GL shaders through Iris and prints compiler statistics for <code>report.py</code>. Its <code>fossils/</code> directory contains Vulkan pipeline databases; Fossilize replays those through ANV and writes CSV for <code>report-fossil.py</code>.</p>
+        <pre><code>cd ../shader-db
+make
+
+cd ../Fossilize
+git submodule update --init
+cmake --workflow --preset linux-release</code></pre>
+        <p>Fossilize's CLI build needs its SPIR-V and JSON submodules. Run the following from the shader-db directory:</p>
+        <pre><code>export PATH="$PWD/../Fossilize/out/build/linux-release/cli:$PATH"
+
+meson devenv -C ../mesa/build-intel \
+  intel_stub_gpu -p ptl -- \
+  env MESA_SHADER_CACHE_DISABLE=true \
+  "$PWD/fossil_replay.sh" "$PWD/fossils" "$PWD/brw.csv" --num-threads 1
+
+meson devenv -C ../mesa/build-intel \
+  intel_stub_gpu -p ptl -- \
+  env MESA_SHADER_CACHE_DISABLE=true INTEL_JAY=all \
+  "$PWD/fossil_replay.sh" "$PWD/fossils" "$PWD/jay.csv" --num-threads 1
+
+./report-fossil.py brw.csv jay.csv</code></pre>
+        <p>The path is <code>.foz → Fossilize → ANV → BRW or Jay → CSV</code>. <code>INTEL_JAY=all</code> selects Jay for every supported stage. The helper uses a separate replay process per database and combines their CSV output.</p>
+        <p>The classic Iris runner currently prints BRW statistics but no equivalent <code>report.py</code> lines when Jay is selected. For Jay/BRW comparisons I use the ANV/Fossilize path.</p>
+
+        <h2 id="stats">Reading the statistics</h2>
+        <p><code>report-fossil.py</code> treats a subgroup-size change specially: for that executable it reports the subgroup change and discards the other metric deltas. For a controlled compute comparison, <code>INTEL_SIMD_DEBUG=cs16</code> can force the allowed compute mode to SIMD16, but it changes compiler policy and should not be part of an ordinary baseline.</p>
+        <p>A missing backend statistic may arrive as zero and appear as <code>+inf%</code> or <code>-inf%</code>. That is not an infinite performance change. Check the CSV columns and raw rows before interpreting it.</p>
+        <p>Instruction count, code size, estimated cycles, registers, spills and scratch are static compiler statistics. With a stub GPU they can identify code-quality differences, not rendering correctness or real GPU speed. Compile-time measurements also need cache-disabled paired runs, fixed inputs and thread count, and several repetitions; process startup and CPU scheduling remain noise.</p>
+
+        <h2 id="tree">Finding a code path</h2>
+        <p>Mesa is several shared layers in <a href="https://docs.mesa3d.org/sourcetree.html">one source tree</a>. I start from an API entry point, a debug string, a stack trace, or an IR dump, then follow the boundary I care about.</p>
+        <pre><code>rg 'vkCreateGraphicsPipelines' src/
+rg 'NIR_PASS.*nir_opt_' src/
+rg 'DEBUG|DUMP|VALIDATE' src/&lt;driver&gt;/</code></pre>
+        <p>Searching for the literal text of a log message is often faster than guessing the subsystem. Generated files can hide definitions, so I also search <code>build/</code>.</p>
+
+        <h2 id="debug">Debug flags</h2>
+        <p>Mesa has <a href="https://docs.mesa3d.org/envvars.html">common controls</a> such as <code>MESA_DEBUG</code>, <code>MESA_LOG_FILE</code>, <code>NIR_DEBUG</code>, and <code>GALLIUM_HUD</code>, plus driver-specific variables.</p>
+        <pre><code>NIR_DEBUG=help &lt;small-reproducer&gt;
+GALLIUM_HUD=help &lt;small-reproducer&gt;
+rg 'getenv\(|debug_get_flags|_DEBUG' src/&lt;driver&gt;/</code></pre>
+        <p>Many driver variables also accept <code>help</code>. I start with the smallest reproducer, redirect noisy output, and keep the full environment with the result.</p>
+        <p>For compiler work, I compare before and after at the earliest IR boundary. For runtime problems, I separate loader selection, CPU work, submission, and GPU execution.</p>
+
+        <h2 id="sanitizers">Sanitizer builds</h2>
+        <p>Undefined behaviour and memory errors on the CPU side can look like driver or GPU failures. <a href="https://docs.mesa3d.org/graphics-debugging/debugging-misrenderings-crashes.html">Mesa's debugging guide</a> suggests UBSan and thread sanitizer. I also keep an ASan/UBSan build:</p>
+        <pre><code>meson setup build-san -Dbuildtype=debugoptimized \
+  -Db_sanitize=address,undefined &lt;driver options&gt;
+ninja -C build-san
+meson devenv -C build-san &lt;small-reproducer&gt;
+
+meson setup build-tsan -Dbuildtype=debugoptimized \
+  -Db_sanitize=thread &lt;driver options&gt;
+ninja -C build-tsan
+meson devenv -C build-tsan &lt;small-reproducer&gt;</code></pre>
+        <p><code>debugoptimized</code> keeps debug information and assertions. I still reduce a sanitizer report to a small reproducer before treating the first stack trace as the cause.</p>
+
+        <h2 id="bisect">Bisecting regressions</h2>
+        <p>If the same reproducer is good at an older commit and bad now, <a href="https://git-scm.com/docs/git-bisect"><code>git bisect</code></a> is usually better than reading the commits in between:</p>
+        <pre><code>git bisect start &lt;bad-commit&gt; &lt;good-commit&gt;
+git bisect run ./repro.sh
+git bisect reset</code></pre>
+        <p>The script must make its result mechanical: 0 for good, 1–127 except 125 for bad, and 125 when the commit cannot be tested. It should build only what is needed.</p>
+
+        <h2 id="proof">Choosing the proof</h2>
+        <p>Different projects forced me to use different stopping points. Shader-db was enough to show that an ACO combine never appeared in my corpus. An Intel stub let me compare BRW and Jay compiler output without the target GPU. The NAK <code>PLOP3 .SIGN</code> work needed <code>nvdisasm</code> for encoding agreement and AD107 hardware for execution semantics. None of those tools substitutes for the others.</p>
+
+        <h2 id="loop">The loop</h2>
+        <p>I try to keep one question per run: reproduce, capture the earliest useful boundary, change one thing, rebuild the narrowest target, and compare. If I cannot say what a passing command rules out, the command is probably too broad.</p>
+        <p class="note">Build options and debug flags are developer interfaces. These notes describe the method I use; check <code>meson configure</code>, the current documentation, and the source tree for the exact names in your checkout.</p>
+
+      </div>
+    </article>
+    <nav class="article-nav" aria-label="Article navigation"><a href="aco-standalone-tool.html">← aco_dump</a><a href="how-graphics-drivers-work.html">Linux graphics map →</a></nav>
+  </main>
+  <footer><p><a href="../feed.xml">rss</a></p><p>updated <time datetime="2026-08-26">2026-08-26</time></p></footer>
+</body>
+</html>
