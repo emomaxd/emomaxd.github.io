@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://emomaxd.github.io/</loc><lastmod>2026-08-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/notes.html</loc><lastmod>2026-08-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/work.html</loc><lastmod>2026-08-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/about.html</loc><lastmod>2026-08-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/posts/nak-iadd-sat.html</loc><lastmod>2026-08-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/posts/brw-scoreboard-register-file.html</loc><lastmod>2026-08-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/posts/llvm-thumb-symbol-state.html</loc><lastmod>2026-08-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/posts/nuttx-rk3588s-bringup.html</loc><lastmod>2026-07-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/posts/aco-standalone-tool.html</loc><lastmod>2026-08-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/posts/getting-started-mesa.html</loc><lastmod>2026-08-26</lastmod></url>
-  <url><loc>https://emomaxd.github.io/posts/how-graphics-drivers-work.html</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/notes.html</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/work.html</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/about.html</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/posts/nak-iadd-sat.html</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/posts/brw-scoreboard-register-file.html</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/posts/llvm-thumb-symbol-state.html</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/posts/nuttx-rk3588s-bringup.html</loc><lastmod>2026-07-26</lastmod></url>
+  <url><loc>https://maxd.science/posts/aco-standalone-tool.html</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/posts/getting-started-mesa.html</loc><lastmod>2026-08-26</lastmod></url>
+  <url><loc>https://maxd.science/posts/how-graphics-drivers-work.html</loc><lastmod>2026-08-26</lastmod></url>
 </urlset>

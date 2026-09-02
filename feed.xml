@@ -2,56 +2,56 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Emre Cecanpunar — notes</title>
-    <link>https://emomaxd.github.io/</link>
+    <link>https://maxd.science/</link>
     <description>Technical notes on GPU compilers, graphics drivers, and low-level systems.</description>
     <language>en</language>
-    <atom:link href="https://emomaxd.github.io/feed.xml" rel="self" type="application/rss+xml"/>
+    <atom:link href="https://maxd.science/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
       <title>A signed saturating add through NAK</title>
-      <link>https://emomaxd.github.io/posts/nak-iadd-sat.html</link>
-      <guid>https://emomaxd.github.io/posts/nak-iadd-sat.html</guid>
+      <link>https://maxd.science/posts/nak-iadd-sat.html</link>
+      <guid>https://maxd.science/posts/nak-iadd-sat.html</guid>
       <pubDate>Mon, 24 Aug 2026 12:00:00 +0300</pubDate>
       <description>From CUDA's five-instruction sequence to PLOP3 .SIGN, mixed-source encodings, and CTS.</description>
     </item>
     <item>
       <title>Sizing BRW's scoreboard to the register file</title>
-      <link>https://emomaxd.github.io/posts/brw-scoreboard-register-file.html</link>
-      <guid>https://emomaxd.github.io/posts/brw-scoreboard-register-file.html</guid>
+      <link>https://maxd.science/posts/brw-scoreboard-register-file.html</link>
+      <guid>https://maxd.science/posts/brw-scoreboard-register-file.html</guid>
       <pubDate>Mon, 24 Aug 2026 11:00:00 +0300</pubDate>
       <description>Removing impossible GRF state from a compiler dataflow pass, then measuring the tradeoff.</description>
     </item>
     <item>
       <title>Label state, not directive state, for Thumb symbols</title>
-      <link>https://emomaxd.github.io/posts/llvm-thumb-symbol-state.html</link>
-      <guid>https://emomaxd.github.io/posts/llvm-thumb-symbol-state.html</guid>
+      <link>https://maxd.science/posts/llvm-thumb-symbol-state.html</link>
+      <guid>https://maxd.science/posts/llvm-thumb-symbol-state.html</guid>
       <pubDate>Sun, 26 Jul 2026 12:00:00 +0300</pubDate>
       <description>Tracing a late .type bug through LLVM MC, and how GNU as preserves the right state for Arm and Thumb function symbols.</description>
     </item>
     <item>
       <title>Booting NuttX on RK3588S</title>
-      <link>https://emomaxd.github.io/posts/nuttx-rk3588s-bringup.html</link>
-      <guid>https://emomaxd.github.io/posts/nuttx-rk3588s-bringup.html</guid>
+      <link>https://maxd.science/posts/nuttx-rk3588s-bringup.html</link>
+      <guid>https://maxd.science/posts/nuttx-rk3588s-bringup.html</guid>
       <pubDate>Sun, 26 Jul 2026 11:00:00 +0300</pubDate>
       <description>The initial Apache NuttX ARM64 bring-up for RK3588S and Orange Pi 5 Pro.</description>
     </item>
     <item>
       <title>aco_dump: compiling shaders without a GPU</title>
-      <link>https://emomaxd.github.io/posts/aco-standalone-tool.html</link>
-      <guid>https://emomaxd.github.io/posts/aco-standalone-tool.html</guid>
+      <link>https://maxd.science/posts/aco-standalone-tool.html</link>
+      <guid>https://maxd.science/posts/aco-standalone-tool.html</guid>
       <pubDate>Fri, 20 Mar 2026 00:00:00 +0300</pubDate>
       <description>SPIR-V to ACO IR through RADV/ACO without a physical GPU.</description>
     </item>
     <item>
       <title>My Mesa build and debug loop</title>
-      <link>https://emomaxd.github.io/posts/getting-started-mesa.html</link>
-      <guid>https://emomaxd.github.io/posts/getting-started-mesa.html</guid>
+      <link>https://maxd.science/posts/getting-started-mesa.html</link>
+      <guid>https://maxd.science/posts/getting-started-mesa.html</guid>
       <pubDate>Tue, 13 Jan 2026 00:00:00 +0300</pubDate>
       <description>Small builds, verified driver loading, source search, sanitizers, and bisecting.</description>
     </item>
     <item>
       <title>A working map of the Linux graphics stack</title>
-      <link>https://emomaxd.github.io/posts/how-graphics-drivers-work.html</link>
-      <guid>https://emomaxd.github.io/posts/how-graphics-drivers-work.html</guid>
+      <link>https://maxd.science/posts/how-graphics-drivers-work.html</link>
+      <guid>https://maxd.science/posts/how-graphics-drivers-work.html</guid>
       <pubDate>Mon, 29 Dec 2025 00:00:00 +0300</pubDate>
       <description>The boundaries between a Vulkan application, Mesa, DRM, and GPU machine code.</description>
     </item>
