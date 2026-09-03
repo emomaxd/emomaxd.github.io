@@ -1,19 +1,30 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Selected upstream work by Emre Cecanpunar in GPU compilers, graphics drivers, Linux, LLVM, and Apache NuttX.">
-    <meta name="author" content="Emre Cecanpunar">
-    <meta name="theme-color" content="#ffffff">
-    <meta property="og:title" content="work — emomaxd">
-    <meta property="og:description" content="Selected work in GPU compilers, graphics drivers, and low-level systems.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://maxd.science/work.html">
-    <link rel="canonical" href="https://maxd.science/work.html">
-    <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="feed.xml">
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="style.css">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Selected upstream work by Emre Cecanpunar in Mesa, Linux graphics, and low-level systems."
+    />
+    <meta name="author" content="Emre Cecanpunar" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta property="og:title" content="work — emomaxd" />
+    <meta
+      property="og:description"
+      content="Selected work in GPU compilers, graphics drivers, and low-level systems."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://maxd.science/work.html" />
+    <link rel="canonical" href="https://maxd.science/work.html" />
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="Emre Cecanpunar's notes"
+      href="feed.xml"
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
     <title>work — emomaxd</title>
   </head>
   <body class="work-page">
@@ -44,15 +55,29 @@
             <h3>Mesa</h3>
 
             <p>
-              Current work is centered on Jay,
-              alongside Intel's BRW compiler and ANV driver.
+              Most of my current work is in Mesa, mainly around GPU compilers
+              and drivers.
+            </p>
+
+            <p>
+              Right now I am mostly interested in Jay, alongside with BRW and
+              ANV.
             </p>
 
             <p class="work-links">
-              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/commits/main?author=emreleno@gmail.com">commits ↗</a>
-              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests?scope=all&state=all&author_username=emomaxd">merge requests ↗</a>
-              <a href="https://gitlab.freedesktop.org/emomaxd?activity_filter=comments">discussions ↗</a>
-                </p>
+              <a
+                href="https://gitlab.freedesktop.org/mesa/mesa/-/commits/main?author=emreleno@gmail.com"
+                >commits ↗</a
+              >
+              <a
+                href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests?scope=all&state=all&author_username=emomaxd"
+                >merge requests ↗</a
+              >
+              <a
+                href="https://gitlab.freedesktop.org/emomaxd?activity_filter=comments"
+                >discussions ↗</a
+              >
+            </p>
           </article>
 
           <article>
@@ -62,15 +87,13 @@
 
             <h3>Linux kernel</h3>
 
-            <p>
-              Upstreamed a five-patch hp-wmi series.
-            </p>
-            <p>
-              Current focus is focused on Intel DRM/Xe memory management and scheduling.
-            </p>
+            <p>Upstreamed a five-patch hp-wmi series.</p>
+            <p>I Also read Intel DRM/Xe and patches when I have time.</p>
 
             <p class="work-links">
-              <a href="https://lore.kernel.org/all/?q=emreleno@gmail.com">patches ↗</a>
+              <a href="https://lore.kernel.org/all/?q=emreleno@gmail.com"
+                >patches ↗</a
+              >
             </p>
           </article>
 
@@ -82,15 +105,15 @@
             <h3>LLVM</h3>
 
             <p>
-              Studying LLVM compiler infrastructure and comparing it with Mesa backends.
-            </p>
-
-            <p>
-              Occasional patches, including an Arm/Thumb MC correctness fix.
+              Studying LLVM compiler infrastructure and comparing it with Mesa
+              backends.
             </p>
 
             <p class="work-links">
-              <a href="https://github.com/llvm/llvm-project/pulls?q=author%3Aemomaxd">pull requests ↗</a>
+              <a
+                href="https://github.com/llvm/llvm-project/pulls?q=author%3Aemomaxd"
+                >pull requests ↗</a
+              >
               <a href="posts/llvm-thumb-symbol-state.html">notes →</a>
             </p>
           </article>
@@ -102,13 +125,16 @@
 
             <h3>Apache NuttX</h3>
 
-            <p>
-              Initial RK3588S and Orange Pi 5 Pro support.
-            </p>
+            <p>Initial RK3588S and Orange Pi 5 Pro support.</p>
 
             <p class="work-links">
-              <a href="https://github.com/apache/nuttx/pull/19489">RK3588S PR ↗</a>
-              <a href="https://nuttx.apache.org/docs/latest/platforms/arm64/rk3588/boards/orangepi-5-pro/index.html">docs ↗</a>
+              <a href="https://github.com/apache/nuttx/pull/19489"
+                >RK3588S PR ↗</a
+              >
+              <a
+                href="https://nuttx.apache.org/docs/latest/platforms/arm64/rk3588/boards/orangepi-5-pro/index.html"
+                >docs ↗</a
+              >
               <a href="posts/nuttx-rk3588s-bringup.html">notes →</a>
             </p>
           </article>
@@ -120,13 +146,16 @@
 
             <h3>Userspace graphics</h3>
 
-            <p>
-              Memory-safety fixes in Wayland and egl-wayland2.
-            </p>
+            <p>Memory-safety fixes in Wayland and egl-wayland2.</p>
 
             <p class="work-links">
-              <a href="https://github.com/NVIDIA/egl-wayland2/pull/52">egl-wayland2 ↗</a>
-              <a href="https://gitlab.freedesktop.org/wayland/wayland/-/merge_requests/549">wayland ↗</a>
+              <a href="https://github.com/NVIDIA/egl-wayland2/pull/52"
+                >egl-wayland2 ↗</a
+              >
+              <a
+                href="https://gitlab.freedesktop.org/wayland/wayland/-/merge_requests/549"
+                >wayland ↗</a
+              >
             </p>
           </article>
         </div>
@@ -151,7 +180,10 @@
             <p class="work-links">
               <a href="https://baykartech.com">Baykar ↗</a>
               <a href="https://t3gemstone.org">T3 Gemstone ↗</a>
-              <a href="https://github.com/t3gemstone/nuttx/commit/0164001944c67bba2a9664d61e0a2c6130aeea94">port commit ↗</a>
+              <a
+                href="https://github.com/t3gemstone/nuttx/commit/0164001944c67bba2a9664d61e0a2c6130aeea94"
+                >port commit ↗</a
+              >
             </p>
           </article>
         </div>
@@ -169,18 +201,19 @@
             <h3>Standalone ACO shader compilation</h3>
 
             <p>
-              A local tool that runs SPIR-V through RADV and ACO using
-              drm-shim, without AMD hardware.
+              A local tool that runs SPIR-V through RADV and ACO using drm-shim,
+              without AMD hardware.
             </p>
 
             <p class="work-links">
-              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/issues/15111">discussion ↗</a>
+              <a href="https://gitlab.freedesktop.org/mesa/mesa/-/issues/15111"
+                >discussion ↗</a
+              >
               <a href="posts/aco-standalone-tool.html">note →</a>
             </p>
           </article>
         </div>
       </section>
-
     </main>
 
     <footer>
