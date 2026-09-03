@@ -1,19 +1,30 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Technical notes by Emre Cecanpunar on GPU compilers, graphics drivers, and low-level systems.">
-    <meta name="author" content="Emre Cecanpunar">
-    <meta name="theme-color" content="#ffffff">
-    <meta property="og:title" content="notes — emomaxd">
-    <meta property="og:description" content="Technical notes on GPU compilers, graphics drivers, and low-level systems.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://maxd.science/notes.html">
-    <link rel="canonical" href="https://maxd.science/notes.html">
-    <link rel="alternate" type="application/rss+xml" title="Emre Cecanpunar's notes" href="feed.xml">
-    <link rel="icon" href="favicon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="style.css">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Technical notes by Emre Cecanpunar on GPU compilers, graphics drivers, and low-level systems."
+    />
+    <meta name="author" content="Emre Cecanpunar" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta property="og:title" content="notes — emomaxd" />
+    <meta
+      property="og:description"
+      content="Technical notes on GPU compilers, graphics drivers, and low-level systems."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://maxd.science/notes.html" />
+    <link rel="canonical" href="https://maxd.science/notes.html" />
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="Emre Cecanpunar's notes"
+      href="feed.xml"
+    />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
     <title>notes — emomaxd</title>
   </head>
   <body class="notes-page">
@@ -36,51 +47,118 @@
       <ol class="post-list">
         <li>
           <article>
-            <div class="post-meta"><time datetime="2026-08-24">2026-08-24</time><span>mesa / nak / nvk</span><span>local WIP</span></div>
-            <h2><a href="posts/nak-iadd-sat.html">A signed saturating add through NAK&nbsp;→</a></h2>
-            <p>From CUDA's five-instruction sequence to <code>PLOP3 .SIGN</code>, mixed-source encodings, and CTS.</p>
+            <div class="post-meta">
+              <time datetime="2026-08-24">2026-08-24</time
+              ><span>mesa / nak / nvk</span><span>local WIP</span>
+            </div>
+            <h2>
+              <a href="posts/nak-iadd-sat.html"
+                >A signed saturating add through NAK&nbsp;→</a
+              >
+            </h2>
+            <p>
+              From CUDA's five-instruction sequence to <code>PLOP3 .SIGN</code>,
+              mixed-source encodings, and CTS.
+            </p>
           </article>
         </li>
         <li>
           <article>
-            <div class="post-meta"><time datetime="2026-08-24">2026-08-24</time><span>mesa / brw / performance</span><span>open MR</span></div>
-            <h2><a href="posts/brw-scoreboard-register-file.html">Sizing BRW’s scoreboard to the register file&nbsp;→</a></h2>
-            <p>Removing impossible GRF state from a compiler dataflow pass, then measuring the tradeoff.</p>
+            <div class="post-meta">
+              <time datetime="2026-08-24">2026-08-24</time
+              ><span>mesa / brw / performance</span><span>open MR</span>
+            </div>
+            <h2>
+              <a href="posts/brw-scoreboard-register-file.html"
+                >Sizing BRW’s scoreboard to the register file&nbsp;→</a
+              >
+            </h2>
+            <p>
+              Removing impossible GRF state from a compiler dataflow pass, then
+              measuring the tradeoff.
+            </p>
           </article>
         </li>
         <li>
           <article>
-            <div class="post-meta"><time datetime="2026-07-26">2026-07-26</time><span>llvm / mc / arm</span><span>merged</span></div>
-            <h2><a href="posts/llvm-thumb-symbol-state.html">Label state, not directive state, for Thumb symbols&nbsp;→</a></h2>
-            <p>An Arm assembler bug caused by reading ISA state at a late <code>.type</code> directive.</p>
+            <div class="post-meta">
+              <time datetime="2026-07-26">2026-07-26</time
+              ><span>llvm / mc / arm</span><span>merged</span>
+            </div>
+            <h2>
+              <a href="posts/llvm-thumb-symbol-state.html"
+                >Label state, not directive state, for Thumb symbols&nbsp;→</a
+              >
+            </h2>
+            <p>
+              An Arm assembler bug caused by reading ISA state at a late
+              <code>.type</code> directive.
+            </p>
           </article>
         </li>
         <li>
           <article>
-            <div class="post-meta"><time datetime="2026-07-26">2026-07-26</time><span>nuttx / arm64</span><span>merged</span></div>
-            <h2><a href="posts/nuttx-rk3588s-bringup.html">Booting NuttX on RK3588S&nbsp;→</a></h2>
+            <div class="post-meta">
+              <time datetime="2026-07-26">2026-07-26</time
+              ><span>nuttx / arm64</span><span>merged</span>
+            </div>
+            <h2>
+              <a href="posts/nuttx-rk3588s-bringup.html"
+                >Booting NuttX on RK3588S&nbsp;→</a
+              >
+            </h2>
             <p>The initial Orange Pi 5 Pro port, from U-Boot handoff to NSH.</p>
           </article>
         </li>
         <li>
           <article>
-            <div class="post-meta"><time datetime="2026-03-20">2026-03-20</time><span>mesa / radv / aco</span><span>prototype</span></div>
-            <h2><a href="posts/aco-standalone-tool.html">aco_dump: compiling shaders without a GPU&nbsp;→</a></h2>
-            <p>Running SPIR-V through RADV and ACO using drm-shim, without physical AMD hardware.</p>
+            <div class="post-meta">
+              <time datetime="2026-03-20">2026-03-20</time
+              ><span>mesa / radv / aco</span><span>prototype</span>
+            </div>
+            <h2>
+              <a href="posts/aco-standalone-tool.html"
+                >aco_dump: compiling shaders without a GPU&nbsp;→</a
+              >
+            </h2>
+            <p>
+              Running SPIR-V through RADV and ACO using drm-shim, without
+              physical AMD hardware.
+            </p>
           </article>
         </li>
         <li>
           <article>
-            <div class="post-meta"><time datetime="2026-01-13">2026-01-13</time><span>mesa</span><span>reference</span></div>
-            <h2><a href="posts/getting-started-mesa.html">My Mesa build and debug loop&nbsp;→</a></h2>
-            <p>Small builds, verified driver loading, source search, sanitizers, and bisecting.</p>
+            <div class="post-meta">
+              <time datetime="2026-01-13">2026-01-13</time><span>mesa</span
+              ><span>reference</span>
+            </div>
+            <h2>
+              <a href="posts/getting-started-mesa.html"
+                >My Mesa build and debug loop&nbsp;→</a
+              >
+            </h2>
+            <p>
+              Small builds, verified driver loading, source search, sanitizers,
+              and bisecting.
+            </p>
           </article>
         </li>
         <li>
           <article>
-            <div class="post-meta"><time datetime="2025-12-29">2025-12-29</time><span>linux graphics</span><span>map</span></div>
-            <h2><a href="posts/how-graphics-drivers-work.html">A working map of the Linux graphics stack&nbsp;→</a></h2>
-            <p>The boundaries between a Vulkan application, Mesa, DRM, and GPU machine code.</p>
+            <div class="post-meta">
+              <time datetime="2025-12-29">2025-12-29</time
+              ><span>linux graphics</span><span>map</span>
+            </div>
+            <h2>
+              <a href="posts/how-graphics-drivers-work.html"
+                >A working map of the Linux graphics stack&nbsp;→</a
+              >
+            </h2>
+            <p>
+              The boundaries between a Vulkan application, Mesa, DRM, and GPU
+              machine code.
+            </p>
           </article>
         </li>
       </ol>
@@ -88,7 +166,7 @@
 
     <footer>
       <p><a href="feed.xml">rss</a></p>
-      <p>updated <time datetime="2026-08-26">2026-08-26</time></p>
+      <p>updated <time datetime="2026-09-04">2026-09-04</time></p>
     </footer>
   </body>
 </html>
