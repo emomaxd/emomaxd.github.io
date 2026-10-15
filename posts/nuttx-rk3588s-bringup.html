@@ -1,0 +1,323 @@
+<!doctype html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <meta
+      content="The initial Apache NuttX ARM64 bring-up for RK3588S, from U-Boot relocation and EL2 handoff to early UART assembly and NSH."
+      name="description"
+    />
+    <meta content="#ffffff" name="theme-color" />
+    <meta content="Booting NuttX on RK3588S — emomaxd" property="og:title" />
+    <meta
+      content="The initial Apache NuttX ARM64 bring-up for RK3588S, from U-Boot relocation and EL2 handoff to early UART assembly and NSH."
+      property="og:description"
+    />
+    <meta content="article" property="og:type" />
+    <meta
+      content="https://maxd.science/posts/nuttx-rk3588s-bringup.html"
+      property="og:url"
+    />
+    <link
+      href="https://maxd.science/posts/nuttx-rk3588s-bringup.html"
+      rel="canonical"
+    />
+    <link href="../favicon.svg" rel="icon" type="image/svg+xml" />
+    <link href="../style.css" rel="stylesheet" />
+    <title>Booting NuttX on RK3588S — emomaxd</title>
+  </head>
+  <body class="article-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <main id="content">
+      <article>
+        <header class="article-header">
+          <h1>Booting NuttX on RK3588S</h1>
+          <div class="article-meta">
+            <time datetime="2026-07-26">26 July 2026</time>
+          </div>
+        </header>
+        <p>
+          I wanted one thing from my Orange Pi 5 Pro: an
+          <code>nsh&gt;</code> prompt. Linux already booted on it. How much
+          would it take to get NuttX there? Before writing board code, I needed
+          to understand what U-Boot left behind when it jumped into the kernel.
+        </p>
+        <p>
+          U-Boot and TF-A already did the firmware work. I wasn't going to
+          reimplement it. The tricky bit was finding
+          <a
+            href="https://github.com/apache/nuttx/blob/afd94c7311b15bd3a178c06e7f1e88285af5540a/Documentation/platforms/arm64/rk3588/boards/orangepi-5-pro/index.rst#L128-L138"
+            >the exact handoff NuttX could rely on</a
+          >, especially when a bad memory attribute can kill the boot before the
+          UART says a word.
+        </p>
+        <h2 id="choice">What can I trust from another board?</h2>
+        <p>
+          I had worked on AM67A at Baykar, and Matteo Golin's Raspberry Pi 4B
+          port was another useful reference. Both showed how the ARM64 startup
+          fits together. Neither could tell me what addresses and CPU state this
+          particular board would have. That part needed checking.
+        </p>
+        <h2 id="boundary">Who owns the machine before NuttX?</h2>
+        <p>
+          First, the boot chain. By the time NuttX gets control, DRAM is
+          initialized, TF-A has run, and U-Boot has configured UART2's clock and
+          pins. That is a lot less platform work than starting from a blank SoC.
+          But what exactly happens at the last jump?
+        </p>
+        <pre><code>BootROM
+  → DDR initialization / TPL
+  → U-Boot SPL
+  → TF-A BL31
+  → U-Boot proper
+  → NuttX</code></pre>
+        <p>
+          U-Boot already speaks the ordinary ARM64 Linux Image convention: the
+          DTB address goes in <code>x0</code>, then execution branches to the
+          image entry point. The first NuttX port doesn't even parse the DTB,
+          but <code>booti</code> still saves me from inventing a private
+          handoff. (<span class="inline-sources"
+            ><a
+              href="https://www.kernel.org/doc/html/latest/arch/arm64/booting.html"
+              >Linux ARM64 boot protocol</a
+            >,
+            <a
+              href="https://github.com/radxa/u-boot/blob/5202c429/arch/arm/lib/bootm.c#L380-L422"
+              >U-Boot handoff</a
+            ></span
+          >)
+        </p>
+        <p>
+          The
+          <a
+            href="https://github.com/radxa/u-boot/blob/5202c429/arch/arm/cpu/armv8/cpu.c#L34-L59"
+            >downstream U-Boot cleanup code</a
+          >
+          <a
+            href="https://github.com/radxa/u-boot/blob/5202c429/arch/arm/cpu/armv8/cache_v8.c#L475-L491"
+            >disables caches and the MMU</a
+          >
+          on this path. On my board I observed an EL2 entry. I'd rather check
+          those details than assume a generic ARM64 diagram describes the state
+          of my machine.
+        </p>
+        <h2 id="image">Wait, where did the image go?</h2>
+        <p>
+          The
+          <a
+            href="https://github.com/apache/nuttx/blob/afd94c7311b15bd3a178c06e7f1e88285af5540a/arch/arm64/src/common/arm64_head.S#L78-L117"
+            >ARM64 Image header</a
+          >
+          turned out to be more interesting than it looked. Alongside the entry
+          stub, it carries a load offset and a relocatable-image flag. That
+          means <code>booti</code> may not leave the image where I loaded it.
+        </p>
+        <p>
+          I load <code>nuttx.bin</code> at <code>0x02000000</code>. The NuttX
+          header sets the relocatable-image flag, so the
+          <a
+            href="https://github.com/radxa/u-boot/blob/5202c429/cmd/booti.c#L35-L86"
+            >U-Boot relocation calculation</a
+          >
+          is:
+        </p>
+        <pre><code>ALIGN(0x02000000 - 0x00480000, 2 MiB) + 0x00480000
+= 0x02080000</code></pre>
+        <p>
+          I loaded <code>nuttx.bin</code> at <code>0x02000000</code>. U-Boot
+          moved it to <code>0x02080000</code>. There's the answer to an
+          otherwise odd-looking <code>CONFIG_RAM_START</code>: it came from the
+          loader calculation, not a number I picked for convenience.
+        </p>
+        <p>
+          The first version uses identity mappings and exposes a conservative
+          512 MiB RAM window. That is the configured
+          <a
+            href="https://github.com/apache/nuttx/blob/e62f748960477f4e8432bea0e73e7671b06756e6/boards/arm64/rk3588/orangepi-5-pro/configs/nsh/defconfig#L48-L49"
+            ><code>CONFIG_RAM_SIZE</code>, not an RK3588S hardware limit</a
+          >. I kept the initial map inside the available DRAM above the firmware
+          reservations; the port does not yet consume the device tree.
+        </p>
+        <h2 id="handoff">What state are we entering in?</h2>
+        <p>
+          The entry point had moved, and the CPU arrived at EL2. The common
+          ARM64 startup sets up an early stack, clears <code>.bss</code>,
+          prepares the EL2 state, and uses <code>eret</code> to reach EL1.
+        </p>
+        <pre><code>U-Boot booti
+  → __start / real_start
+  → arm64_earlyprintinit()
+  → clear .bss
+  → arm64_boot_el2_init()
+  → eret to EL1
+  → arm64_boot_el1_init()
+  → arm64_chip_boot()
+  → build the RK3588 mappings and enable the MMU
+  → nx_start()</code></pre>
+        <p>
+          The EL1 setup installs the exception vector table and prepares FP/SIMD
+          and timer state. The RK3588-specific
+          <a
+            href="https://github.com/apache/nuttx/blob/440a18ee7b5bf1de851c143a775afee5bf3bb8ce/arch/arm64/src/rk3588/rk3588_boot.c#L73-L95"
+            ><code>arm64_chip_boot()</code></a
+          >
+          then creates the platform mappings, enables the MMU, selects the SMC
+          conduit for PSCI, and hands serial initialization to the normal 16550
+          driver before the common path enters <code>nx_start()</code>.
+        </p>
+        <h2 id="platform">How little platform support is enough?</h2>
+        <p>
+          I didn't need every peripheral to reach a shell. I needed the
+          interrupt controller, timer, serial console, reset path, and enough
+          memory mapped correctly. I started there, with a deliberately small
+          map.
+        </p>
+        <pre><code>UART2  device-nGnRnE
+GICD   device-nGnRnE
+GICR   device-nGnRnE
+DRAM   normal memory</code></pre>
+        <h2 id="lowputc">Getting the first byte out</h2>
+        <p>
+          Before the first UART byte, debugging is mostly an argument with a
+          silent board. So the early print routine had to be almost
+          embarrassingly small: no scheduler, no interrupts, no initialized
+          driver. Just a register, a status bit, and a character.
+        </p>
+        <p>
+          U-Boot has already set up UART2's clock, pins, and 1.5 Mbaud rate.
+          NuttX is configured not to disturb them at the beginning, so
+          <code>arm64_earlyprintinit()</code> simply returns. (<span
+            class="inline-sources"
+            ><a
+              href="https://github.com/apache/nuttx/blob/e62f748960477f4e8432bea0e73e7671b06756e6/boards/arm64/rk3588/orangepi-5-pro/configs/nsh/defconfig#L8-L20"
+              >Orange Pi 5 Pro configuration</a
+            ></span
+          >)
+        </p>
+        <p>
+          <a
+            href="https://github.com/apache/nuttx/blob/440a18ee7b5bf1de851c143a775afee5bf3bb8ce/arch/arm64/src/rk3588/rk3588_lowputc.S#L36-L63"
+            ><code>arm64_lowputc()</code></a
+          >
+          expands to the essential part of a polling transmit path:
+        </p>
+        <pre><code>ldr   x15, =CONSOLE_UART_BASE
+1: ldr   w2, [x15, #0x14]
+   tst   w2, #(1 &lt;&lt; 5)
+   b.eq  1b
+   str   w0, [x15, #0x00]
+   ret</code></pre>
+        <p>
+          The common startup loop
+          <a
+            href="https://github.com/apache/nuttx/blob/afd94c7311b15bd3a178c06e7f1e88285af5540a/arch/arm64/src/common/arm64_head.S#L360-L378"
+            >loads each character into <code>w0</code> before calling the
+            routine</a
+          >. <code>x15</code> holds <code>0xfeb50000</code>, the UART2 base
+          address exposed as the first configured 16550 instance. With four-byte
+          register spacing, the line-status register is at <code>0x14</code>.
+          Bit 5 is THRE: the transmit holding register is empty and can accept
+          another byte.
+        </p>
+        <p>
+          <code>1b</code> loops back until THRE is set; the final store sends
+          the character. Once that worked, the board was no longer silent.
+          Everything after it could at least leave a clue.
+        </p>
+        <h2 id="boot-command">Trying the boot path</h2>
+        <p>
+          The
+          <a
+            href="https://nuttx.apache.org/docs/latest/platforms/arm64/rk3588/boards/orangepi-5-pro/index.html#boot-procedure"
+            >documented SD-card boot</a
+          >
+          looks like this:
+        </p>
+        <pre><code>load mmc &lt;dev&gt;:1 0x02000000 /nuttx.bin
+load mmc &lt;dev&gt;:1 ${fdt_addr_r} /boot/dtb/rockchip/rk3588s-orangepi-5-pro.dtb
+booti 0x02000000 - ${fdt_addr_r}</code></pre>
+        <h2 id="validation">A prompt is not the whole test</h2>
+        <p>
+          The prompt appeared. Nice. But a prompt doesn't tell me whether the
+          timer works, whether UART receives as well as transmits, or whether
+          reboot works. I checked both build configurations, serial I/O,
+          <code>/proc/uptime</code> and <code>sleep</code>, PSCI reboot, and
+          OSTest on the board.
+        </p>
+        <h2 id="experience">Why I checked the memory map first</h2>
+        <p>
+          There's a reason I kept coming back to the memory map. On AM67A at
+          Baykar,
+          <a
+            href="https://github.com/t3gemstone/nuttx/blob/t3-gem-o1/arch/arm/src/am67/am67_mpuinit.h#L35-L94"
+            >incorrect MPU attributes</a
+          >
+          had caused failures that looked nothing like a clean “memory
+          attributes are wrong” message. That experience stayed with me.
+        </p>
+        <p>
+          Device registers, SRAM, and DDR didn't all want the same treatment.
+          Fixing those attributes and cacheability got the boot moving. So on
+          RK3588S I wrote down the device and normal-memory regions early,
+          before a silent boot could make me question everything else.
+        </p>
+        <p>
+          The Orange Pi was a different situation. Working Linux and U-Boot
+          support already existed downstream; public board support included this
+          <a
+            href="https://github.com/Joshua-Riek/ubuntu-rockchip/blob/88f17e6c4f8853677e15dcec123af0a525efb193/packages/u-boot-radxa-rk3588/debian/patches/0012-Add-support-for-the-Orange-Pi-5-boards.patch"
+            >U-Boot patch</a
+          >
+          and
+          <a
+            href="https://github.com/Joshua-Riek/linux-rockchip/commit/bca5756aa794538abd988b10e3c513c7b7ea5870"
+            >Linux device tree</a
+          >. I applied board support for both and was adding NuttX on top of a
+          known path, not bringing every layer up with it.
+        </p>
+        <p>
+          That is why RK3588S starts with UART and GIC as device-nGnRnE and DRAM
+          as normal memory. It is a small map, not a complete description of the
+          SoC. (<span class="inline-sources"
+            ><a
+              href="https://github.com/apache/nuttx/blob/440a18ee7b5bf1de851c143a775afee5bf3bb8ce/arch/arm64/src/rk3588/rk3588_boot.c#L40-L82"
+              >memory map</a
+            ></span
+          >)
+        </p>
+        <h2 id="scope">Where the port stands</h2>
+        <p>
+          I got the shell, and the
+          <a
+            href="https://github.com/apache/nuttx/blob/afd94c7311b15bd3a178c06e7f1e88285af5540a/Documentation/platforms/arm64/rk3588/boards/orangepi-5-pro/index.rst#L203-L213"
+            >initial hardware checks passed</a
+          >. That was the goal for this port, not the end of board support. DTB
+          parsing, secondary cores, and
+          <a
+            href="https://github.com/apache/nuttx/blob/afd94c7311b15bd3a178c06e7f1e88285af5540a/Documentation/platforms/arm64/rk3588/boards/orangepi-5-pro/index.rst#L45-L56"
+            >most peripherals are still future work</a
+          >.
+        </p>
+        <p>
+          The port was merged in
+          <a href="https://github.com/apache/nuttx/pull/19489"
+            >Apache NuttX PR #19489</a
+          >:
+          <a
+            href="https://github.com/apache/nuttx/commit/440a18ee7b5bf1de851c143a775afee5bf3bb8ce"
+            >RK3588 SoC support</a
+          >,
+          <a
+            href="https://github.com/apache/nuttx/commit/e62f748960477f4e8432bea0e73e7671b06756e6"
+            >the Orange Pi 5 Pro board</a
+          >, and
+          <a
+            href="https://github.com/apache/nuttx/commit/afd94c7311b15bd3a178c06e7f1e88285af5540a"
+            >the bring-up guide</a
+          >.
+        </p>
+      </article>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <meta
+      content="Emre Cecanpunar is a Linux graphics developer working on GPU compilers and drivers in Mesa."
+      name="description"
+    />
+    <meta content="Emre Cecanpunar" name="author" />
+    <meta content="#ffffff" name="theme-color" />
+    <meta content="emomaxd" property="og:site_name" />
+    <meta content="emomaxd" property="og:title" />
+    <meta
+      content="Linux graphics developer working on GPU compilers and drivers in Mesa."
+      property="og:description"
+    />
+    <meta content="website" property="og:type" />
+    <meta content="https://maxd.science/" property="og:url" />
+    <link href="https://maxd.science/" rel="canonical" />
+
+    <link href="favicon.svg" rel="icon" type="image/svg+xml" />
+    <link href="style.css" rel="stylesheet" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://maxd.science/#website",
+            "url": "https://maxd.science/",
+            "name": "emomaxd",
+            "alternateName": "maxd.science",
+            "author": {
+              "@id": "https://maxd.science/#person"
+            }
+          },
+          {
+            "@type": "Person",
+            "@id": "https://maxd.science/#person",
+            "name": "Emre Cecanpunar",
+            "alternateName": "emomaxd",
+            "url": "https://maxd.science/",
+            "sameAs": [
+              "https://github.com/emomaxd",
+              "https://gitlab.freedesktop.org/emomaxd",
+              "https://www.linkedin.com/in/emre-cecanpunar"
+            ]
+          }
+        ]
+      }
+    </script>
+    <title>emomaxd</title>
+  </head>
+  <body class="index-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <main id="content">
+      <header class="hero">
+        <h1>
+          <button
+            aria-label="Toggle between full name and handle"
+            class="name-toggle"
+            type="button"
+          >
+            <span class="name-part">Emre</span>
+            <span class="name-part">Cecanpunar</span>
+          </button>
+        </h1>
+        <div class="home-intro">
+          <div class="home-copy">
+            <div class="home-text">
+              <p class="lede">I work on Mesa and Linux graphics.</p>
+              <p class="home-links">
+                Currently hacking on Jay, a state-of-the-art shader compiler.
+              </p>
+              <p class="home-links">
+                <a href="emre-cecanpunar-resume.pdf">résumé</a> ·
+                <a href="mailto:emreleno@gmail.com">email</a>
+              </p>
+            </div>
+          </div>
+          <img
+            alt="Portrait of Emre"
+            class="home-photo"
+            decoding="async"
+            fetchpriority="high"
+            height="1280"
+            src="assets/images/emre-2026-1.jpg"
+            width="960"
+          />
+        </div>
+      </header>
+      <section aria-label="Technical notes" class="home-posts">
+        <article class="home-post">
+          <h2>
+            <a href="posts/jay-gfx12.html">Bringing Jay to Intel Gfx12</a>
+          </h2>
+          <p>
+            Mesa has a new Intel shader compiler, built for newer GPUs. My
+            laptop has Raptor Lake. Time for a little black magic.
+          </p>
+        </article>
+        <article class="home-post">
+          <h2>
+            <a href="posts/nak-iadd-sat.html"
+              >A signed saturating add through NAK</a
+            >
+          </h2>
+          <p>
+            One line of PTX caught my eye while browsing Mesa's issues. Five
+            machine instructions and 152 CTS failures later, here we are.
+          </p>
+        </article>
+        <article class="home-post">
+          <h2>
+            <a href="posts/nuttx-rk3588s-bringup.html"
+              >Booting NuttX on RK3588S</a
+            >
+          </h2>
+          <p>
+            The Orange Pi 5 Pro already knew how to boot Linux. I taught it one
+            more trick.
+          </p>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const nameToggle = document.querySelector(".name-toggle");
+
+      if (nameToggle) {
+        const fullNameMarkup = nameToggle.innerHTML;
+        let showingAlias = false;
+
+        nameToggle.addEventListener("click", () => {
+          showingAlias = !showingAlias;
+
+          if (showingAlias) {
+            nameToggle.textContent = "emomaxd";
+          } else {
+            nameToggle.innerHTML = fullNameMarkup;
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

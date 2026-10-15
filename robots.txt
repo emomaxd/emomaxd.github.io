@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://maxd.science/sitemap.xml
+Sitemap: https://maxd.science/sitemap.txt
