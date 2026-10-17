@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://maxd.science/sitemap.xml
-Sitemap: https://maxd.science/sitemap.txt
+Sitemap: https://emrececanpunar.org/sitemap.xml
+Sitemap: https://emrececanpunar.org/sitemap.txt
