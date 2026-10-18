@@ -1,0 +1,269 @@
+<!doctype html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <link href="../favicon.svg" rel="icon" type="image/svg+xml" />
+    <link href="../style.css" rel="stylesheet" />
+    <title>Bringing Jay to Intel Gfx12 — Emre Cecanpunar</title>
+  </head>
+  <body class="article-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <main id="content">
+      <article>
+        <header class="article-header">
+          <h1>Bringing Jay to Intel Gfx12</h1>
+          <div class="article-meta">
+            <time datetime="2026-10-16">16 October 2026</time>
+          </div>
+        </header>
+        <p>
+          Jay is Mesa's state-of-the-art shader compiler, built around SSA, a
+          SIMT register model, and tree-scan register allocation. It was
+          developed around newer hardware.
+        </p>
+        <p>
+          I emailed Alyssa looking for unowned Jay work. I did not have Xe2+
+          hardware, I explained, but I was planning to buy an Xe3 laptop.
+        </p>
+        <p>She had a cheaper idea. Did I already have an older Intel GPU?</p>
+        <p>
+          I did. She sent me her Gfx12.5 work, and I used it as the starting
+          point for bringing the FS8 path to Gfx12.0 on Raptor Lake. This is
+          how my laptop became a compiler target.
+        </p>
+        <p>
+          This is the first step. Jay FS8 now renders <code>vkcube</code> on
+          Raptor Lake; SIMD16, SIMD32, vertex shaders and broader CTS coverage
+          are still open.
+        </p>
+        <p>
+          Code:
+          <a
+            href="https://gitlab.freedesktop.org/emomaxd/mesa/-/tree/jay-gfx12-arl7"
+            >my Gfx12 branch</a
+          >.
+        </p>
+        <p>
+          Thanks to <a href="https://alyssarosenzweig.ca/">Alyssa Rosenzweig</a>
+          for sharing her work-in-progress branch, reviewing the patches, and
+          helping me find a useful starting point.
+        </p>
+        <h2 id="why-jay">Why Jay is interesting</h2>
+        <p>
+          Intel's GPU ISA is explicitly SIMD. It has source regions, strides,
+          and register-layout rules that get particularly awkward when control
+          flow diverges. Modelling all of that directly increases register
+          pressure and calls for expensive allocation algorithms. Not an
+          especially welcoming place for a simple register allocator.
+        </p>
+        <p>
+          The part that caught my attention was Jay's approach to register
+          allocation. SSA tree scan on Intel? With all those regioning rules?
+          Jay essentially puts off dealing with them. It works with a simpler
+          per-lane SSA model, separates spilling from register assignment, and
+          partitions the physical register file by stride before assigning
+          logical values to it. Braun–Hack and Colombet et al. turn up in the
+          spilling and register-assignment pieces. Alyssa goes through the
+          details in her
+          <a href="https://indico.freedesktop.org/event/12/contributions/527/"
+            >Jay presentation</a
+          >.
+        </p>
+        <p>
+          I like that idea: let most of the compiler work with a machine that's
+          easier to reason about, then deal with Intel's peculiarities where you
+          have to. Of course, the real hardware still gets a vote.
+        </p>
+        <h2 id="cube">A cube that hangs the GPU</h2>
+        <p>
+          BRW, Mesa's existing Intel compiler, rendered <code>vkcube</code>. Jay
+          FS8 hung, and i915 reset the context.
+        </p>
+        <p>
+          Jay's debug table had <code>JAY_DEBUG=noacc</code>, which skips
+          accumulator substitution. I tried it. The full cube rendered.
+        </p>
+        <pre><code>INTEL_JAY=fs INTEL_SIMD_DEBUG=fs8 vkcube
+# GPU hang
+
+JAY_DEBUG=noacc INTEL_JAY=fs INTEL_SIMD_DEBUG=fs8 vkcube
+# renders</code></pre>
+        <p>
+          Interesting, but the full shader did a little bit of everything:
+          texture sampling, sRGB conversion, lighting. Turning off a whole pass
+          had changed too much. I needed a smaller hang.
+        </p>
+        <h2 id="reduction">Making the hang smaller</h2>
+        <p>
+          Removing sRGB conversion changed nothing. If I kept the texture but
+          bypassed lighting, the cube rendered. If I kept the lighting and
+          replaced the texture with white, it still hung. Fine. Texture sampling
+          could leave.
+        </p>
+        <p>
+          The lighting-only shader kept the useful contrast: it hung normally
+          and rendered with <code>noacc</code>. Both ISA dumps still had
+          <code>rsq</code>, so reciprocal square root by itself was not the
+          problem. What changed around it were the accumulator rewrites.
+        </p>
+        <p>
+          I put the same arithmetic into VkRunner. Watching a cube spin is
+          enough to spot a hang; 256 checked pixels are much better at catching
+          a wrong answer. That distinction would matter later.
+        </p>
+        <h2 id="why-acc3">Why look at <code>acc3</code>?</h2>
+        <p>The accumulator-enabled ISA includes this line:</p>
+        <pre><code>mul.f32 acc0, acc3, acc3</code></pre>
+        <p>
+          I noticed <code>acc3</code> appearing twice in a <code>MUL</code>. Was
+          that too many accumulators for this generation? Was reading one twice
+          illegal? Or did the source slot matter? I didn't know yet. Those
+          possibilities gave me a few small changes to try.
+        </p>
+        <p>
+          With an accumulator in <code>MUL</code> source 1, the reduced shader
+          hung. Replacing <code>acc1</code> with <code>acc0</code> didn't help.
+          Moving <code>acc0</code> to source 0 did. So it wasn't just the
+          accumulator number. That made me want to swap the operands without
+          changing the rest of the compiler's choices.
+        </p>
+        <pre><code>mul.f32 dst, grf, acc1  # hangs
+mul.f32 dst, grf, acc0  # hangs
+mul.f32 dst, acc0, grf  # completes</code></pre>
+        <h2 id="gdb">Changing the instruction in GDB</h2>
+        <p>
+          I stopped in GDB at <code>gen_encode</code>, after register
+          allocation, and swapped the two complete <code>MUL</code> source
+          operands. The no-op breakpoint still hung. The actual swap let the
+          reduced shader run. In the original cube I had to swap all five
+          matching multiplies before it survived 120 frames. The destination,
+          instruction order, and scoreboard information stayed put.
+        </p>
+        <pre><code>before: mul.f32 acc1, r20,  acc1
+after:  mul.f32 acc1, acc1, r20</code></pre>
+        <p>
+          Changing only the source order changed the reduced shader from a hang
+          to a completed draw. That isolated the source position rather than
+          the accumulator number.
+        </p>
+        <p>
+          The swap let the lighting-only shader finish. With texture sampling
+          deliberately gone, this is exactly what it was supposed to draw:
+        </p>
+        <figure>
+          <img
+            alt="A white and black textureless cube rendered by the reduced lighting shader after the GDB operand swap"
+            height="658"
+            src="../assets/images/jay-gfx12/vkcube-reduced-after-gdb-swap.png"
+            width="630"
+          />
+          <figcaption>
+            The lighting-only reduction after the GDB swap. The white and black
+            faces are the calculated light intensity, not missing textures or a
+            broken render.
+          </figcaption>
+        </figure>
+        <p>
+          That was enough to send me back to the
+          <a
+            href="https://cdrdv2-public.intel.com/703063/intel-gfx-prm-osrc-tgl-vol-09-render-engine.pdf"
+            >Tiger Lake PRM (Volume 9)</a
+          >. Its general accumulator rule says source 0 only, while the MUL/MAC
+          passage appears to permit source 1 too. I couldn't reconcile those
+          passages from the text alone. On this Raptor Lake GPU, at least, the
+          source-1 version hung and the source-0 version ran.
+        </p>
+        <h2 id="mad">The cube was not a correctness test</h2>
+        <p>
+          The cube ran now. Great. But my VkRunner test still got 50 of its 256
+          pixels wrong.
+        </p>
+        <p>
+          The other bad instruction was a <code>MAD</code> with an accumulator
+          in source 2. A <code>MUL</code> source-1 accumulator hung the GPU; a
+          <code>MAD</code> source-2 accumulator let it run and quietly returned
+          wrong pixels. Same pass, two very different ways to ruin my afternoon.
+        </p>
+        <p>The offending pair was:</p>
+        <pre><code>mul.f32 acc0, r10, 0x3d800000
+mad.f32 r16, u0, acc0, acc0</code></pre>
+        <p>
+          This time the PRM was clearer: rule 5 on printed page 493 (PDF page
+          497) forbids an accumulator in source 2 of a three-source instruction.
+          Rejecting that substitution took VkRunner from 50 wrong pixels to
+          256/256 correct. The derivative-light test passed too, and
+          <code>vkcube</code> completed 120 frames.
+        </p>
+        <pre><code>Probe color at (12,13)
+  Expected: 0.818166 0.818166 0.818166 1.000000
+  Observed: 1.038250 1.038250 1.038250 1.000000
+
+PIGLIT: {"result": "fail"}</code></pre>
+        <p>With the source-2 restriction:</p>
+        <pre><code>PIGLIT: {"result": "pass"}</code></pre>
+        <h2 id="first-cube">The first cube runs</h2>
+        <p>
+          There was one more limit on Raptor Lake: accumulator capacity. With
+          capacity four, the original cube still hung; with capacity two, it ran
+          for 120 frames. That first cube needed three restrictions: no
+          accumulator in <code>MUL</code> source 1, none in
+          <code>MAD</code> source 2, and the smaller Gfx12.0 accumulator pool.
+        </p>
+        <figure>
+          <img
+            alt="vkcube rendered by Jay on an Intel Raptor Lake GPU"
+            height="638"
+            src="../assets/images/jay-gfx12/vkcube-jay.png"
+            width="770"
+          />
+          <figcaption>
+            Jay FS8 running vkcube on the Raptor Lake GPU in my laptop.
+          </figcaption>
+        </figure>
+        <h2 id="cts">CTS had other ideas</h2>
+        <p>I tried a CTS test. Apparently the cube had been too polite.</p>
+        <p>
+          <code>fragcoord_xyz</code> passed with BRW, failed with Jay, and
+          passed again with <code>noacc</code>. Back to the accumulators.
+        </p>
+        <p>
+          I went back through the PRM and compared BRW's validation rules with
+          IGC's accumulator substitution pass. The restrictions needed to cover
+          more than the <code>MUL</code> and <code>MAD</code> instructions in my
+          cube. I extended the source-position checks to two- and three-source
+          instructions, prevented different accumulator sources from being
+          mixed, and checked that accumulator sources and destinations matched.
+        </p>
+        <h2 id="mac">MAD is not MAC</h2>
+        <p>
+          One case brought back an earlier question: was reading the same
+          accumulator twice illegal after all? A repeated-source
+          <code>MAD</code> produced the right result:
+        </p>
+        <pre><code>mad r, acc0, acc0, r3  # correct</code></pre>
+        <p>
+          Jay could turn that into the shorter <code>MAC</code>. I forced the
+          change in GDB so everything else stayed the same:
+        </p>
+        <pre><code>mac r, acc0, r3        # wrong; MAC also reads implicit acc0</code></pre>
+        <p>
+          So using the same accumulator twice was not the problem. The
+          instruction was. The <code>MAD</code> reads two explicit
+          <code>acc0</code> sources; the <code>MAC</code> also brings in its
+          implicit accumulator source. Jay now keeps the repeated-source
+          <code>MAD</code>, but does not make that conversion when it would
+          leave an explicit accumulator behind.
+        </p>
+        <h2 id="current-limit">The current limit</h2>
+        <p>
+          The local Jay test binary passes all 31 tests, along with the focused
+          Raptor Lake FS8 hardware tests. That is still one fragment-shader path
+          at SIMD8, not complete Gfx12 support. Broader CTS, SIMD16, SIMD32, and
+          the other shader stages remain open.
+        </p>
+      </article>
+    </main>
+  </body>
+</html>
