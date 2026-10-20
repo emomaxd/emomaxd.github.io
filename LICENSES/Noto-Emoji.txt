@@ -2,6 +2,7 @@ Noto Emoji artwork
 
 Horse, wing, and bird artwork Copyright 2013 Google, Inc.
 Adapted from Noto Emoji by Emre Cecanpunar.
+Color palette, arrangement, and composite design Copyright (C) 2026 Emre Cecanpunar.
 
 The original and modified artwork is distributed under the Apache License 2.0.
 Source: https://github.com/googlefonts/noto-emoji
