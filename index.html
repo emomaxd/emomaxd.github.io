@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <link href="favicon.svg" rel="icon" type="image/svg+xml" />
+    <link href="style.css" rel="stylesheet" />
+    <title>Emre Cecanpunar</title>
+  </head>
+  <body class="index-page">
+    <a class="skip-link" href="#content">Skip to content</a>
+    <main id="content">
+      <header class="hero">
+        <h1>Emre Cecanpunar <span class="handle">emomaxd</span></h1>
+        <div class="home-intro">
+          <div class="home-copy">
+            <div class="home-text">
+              <p class="lede">I work on Mesa and Linux graphics.</p>
+              <p class="home-links">
+                Currently hacking on Jay, a state-of-the-art shader compiler.
+              </p>
+              <p class="home-links">
+                <a href="emre-cecanpunar-resume.pdf">résumé</a> · emre at
+                cecanpunar dot org
+              </p>
+            </div>
+          </div>
+          <img
+            alt="Portrait of Emre"
+            class="home-photo"
+            decoding="async"
+            fetchpriority="high"
+            height="1280"
+            src="assets/images/emre-2026-1.jpg"
+            width="960"
+          />
+        </div>
+      </header>
+      <section aria-label="Technical notes" class="home-posts">
+        <article class="home-post">
+          <h2>
+            <a href="posts/jay-gfx12.html">Bringing Jay to Intel Gfx12</a>
+          </h2>
+          <p>
+            I wanted to work on Jay but thought I needed a newer GPU. Turns out
+            my Raptor Lake laptop had plenty for me to do.
+          </p>
+        </article>
+        <article class="home-post">
+          <h2>
+            <a href="posts/nak-iadd-sat.html"
+              >A signed saturating add through NAK</a
+            >
+          </h2>
+          <p>
+            I found a Mesa issue about signed saturating add and tried to
+            implement it in NAK. Five instructions, but there was more to
+            understand than I expected..
+          </p>
+        </article>
+        <article class="home-post">
+          <h2>
+            <a href="posts/nuttx-rk3588s-bringup.html"
+              >Booting NuttX on RK3588S</a
+            >
+          </h2>
+          <p>
+            I wanted to run NuttX on my Orange Pi 5 Pro. Following the boot path
+            from U-Boot to the first UART output and finally an nsh prompt.
+          </p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
