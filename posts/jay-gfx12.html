@@ -31,27 +31,37 @@
         <p>
           I remember when I was developing a game engine and renderer I was
           researching about the gpus and how graphics APIs work, I just couldn't
-          use opengl or vulkan as black boxes that.. literally disturbed me.
-          I really like that handmade kind of stuff Casey and Ryan do, building
+          use opengl or vulkan as black boxes that.. literally disturbed me. I
+          really like that handmade kind of stuff Casey and Ryan do, building
           things from scratch and understanding the hardware and where the
           performance comes from. I wanted to do that kind of stuff myself too,
-          and a few years later somehow I found myself working on Mesa :D.
-          Now I am really close to GPUs and I am really
-          happy with it and still excited about them. Learning new things about
-          GPU and graphics systems is amazing to me. I really like that when I
-          learn one thing it immediately opens up dozens of unlearned things :D
-          it literally unlocks the mountain's unseen part :D. I've also been
-          taking a small look at the DRM side lately.
+          and a few years later somehow I found myself working on Mesa :D. Now I
+          am really close to GPUs and I am really happy with it and still
+          excited about them. Learning new things about GPU and graphics systems
+          is amazing to me. I really like that when I learn one thing it
+          immediately opens up dozens of unlearned things :D it literally
+          unlocks the mountain's unseen part :D. I've also been taking a small
+          look at the DRM side lately.
+        </p>
+        <p>
+          If you're also interested in getting into GPU driver development, Mesa
+          has an excellent
+          <a
+            href="https://docs.mesa3d.org/graphics-debugging/debugging-misrenderings-crashes.html"
+          >
+            guide to debugging GPU hangs, faults, and misrenderings </a
+          >. It walks through how to narrow down issues, from reproducing a bug
+          to isolating the problematic draw call or shader. Definitely worth
+          reading if you're exploring this part of the stack.
         </p>
         <h2 id="finding-jay">Finding Jay</h2>
         <p>
           I have started with ACO, I even made an ACO dump project :D. But I had
-          no AMDGPU so after some time I tried
-          to give some chance to my own hardware. I have an Intel Raptor Lake
-          GPU + Nvidia RTX40xx GPU and ofc I chose the intel.. becauuuseee its
-          not that "blackbox" or "closed" you can have ISA documentations,
-          presentations, and also you can email the developers about your
-          questions :P
+          no AMDGPU so after some time I tried to give some chance to my own
+          hardware. I have an Intel Raptor Lake GPU + Nvidia RTX40xx GPU and ofc
+          I chose the intel.. becauuuseee its not that "blackbox" or "closed"
+          you can have ISA documentations, presentations, and also you can email
+          the developers about your questions :P
         </p>
         <p>
           So when I first started (I couldnt.. actually) with the BRW/ANV
@@ -84,11 +94,11 @@
           to decide which values will be spilled to memory and then uses a
           tree-scan register allocation algorithm based on
           <a href="https://doi.org/10.1145/2038698.2038708">Colombet et al.</a>
-          to.. allocate the registers ofc.
-          The spiller also draws on Braun et al.'s "Simple and Efficient
-          Construction of Static Single Assignment Form" to keep things in
-          ssa form as spilling introduces new definitions. So even though NIR
-          already comes in ssa, there's still work to do here :D
+          to.. allocate the registers ofc. The spiller also draws on Braun et
+          al.'s "Simple and Efficient Construction of Static Single Assignment
+          Form" to keep things in ssa form as spilling introduces new
+          definitions. So even though NIR already comes in ssa, there's still
+          work to do here :D
         </p>
         <p>
           Jay uses a simpler per-lane SSA model and partitions the physical
@@ -99,8 +109,8 @@
         <p>
           BRW is not ssa-based and it supports lots of different architectures
           and over time it groweeeeed so MUCH. and for me its harder to follow,
-          implement new features, find bugs etc. But NIR is ssa, so why
-          leave that behind? Turns out the FS backend goes back to
+          implement new features, find bugs etc. But NIR is ssa, so why leave
+          that behind? Turns out the FS backend goes back to
           <a
             href="https://gitlab.freedesktop.org/mesa/mesa/-/commit/a1bebf73dfd"
             >2010</a
