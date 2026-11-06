@@ -19,225 +19,203 @@
           </div>
         </header>
         <p>
-          Over the last year I was really interested in the Mesa project, I saw
-          ACO's success, Valve's investment in linux gaming and proton stuff.
+          Over the past year, I've become really interested in Mesa. Seeing
+          ACO's success, Valve's investment in Linux gaming, and all the Proton
+          stuff made me want to take a closer look.
         </p>
         <p>
-          I also have a background around graphics programming and low-level
-          programming especially in embedded operating systems, so that kind of
-          stuff pulled me in, I was so curious about what's going on under the
-          hood.
+          I already had some background in graphics and low-level programming,
+          especially embedded operating systems, so it was a pretty natural
+          rabbit hole to fall into. I was really curious about what was going on
+          under the hood.
         </p>
         <p>
-          I remember when I was developing a game engine and renderer I was
-          researching about the gpus and how graphics APIs work, I just couldn't
-          use opengl or vulkan as black boxes that.. literally disturbed me. I
-          really like that handmade kind of stuff Casey and Ryan do, building
-          things from scratch and understanding the hardware and where the
-          performance comes from. I wanted to do that kind of stuff myself too,
-          and a few years later somehow I found myself working on Mesa :D. Now I
-          am really close to GPUs and I am really happy with it and still
-          excited about them. Learning new things about GPU and graphics systems
-          is amazing to me. I really like that when I learn one thing it
-          immediately opens up dozens of unlearned things :D it literally
-          unlocks the mountain's unseen part :D. I've also been taking a small
-          look at the DRM side lately.
+          I remember working on my own game engine and renderer and trying to
+          understand GPUs and how graphics APIs actually work. I just couldn't
+          treat OpenGL or Vulkan as black boxes. That... literally bothered me
+          :D
         </p>
         <p>
-          If you're also interested in getting into GPU driver development, Mesa
-          has an excellent
-          <a
-            href="https://docs.mesa3d.org/graphics-debugging/debugging-misrenderings-crashes.html"
-          >
-            guide to debugging GPU hangs, faults, and misrenderings </a
-          >. It walks through how to narrow down issues, from reproducing a bug
-          to isolating the problematic draw call or shader. Definitely worth
-          reading if you're exploring this part of the stack.
+          I really like the handmade kind of stuff Casey and Ryan do: building
+          things from scratch, understanding the hardware, and figuring out
+          where the performance comes from. I wanted to do that myself too, and
+          a few years later I somehow ended up working on Mesa :D.
+        </p>
+        <p>
+          Now I'm much closer to GPUs, and I'm really happy about that. Learning
+          new things about graphics systems is still amazing to me. I love how
+          learning one thing immediately opens up a dozen things I didn't even
+          know I had to learn. It's like discovering a whole new side of the
+          mountain :D. I've also been poking around the DRM side lately.
         </p>
         <h2 id="finding-jay">Finding Jay</h2>
         <p>
-          I have started with ACO, I even made an ACO dump project :D. But I had
-          no AMDGPU so after some time I tried to give some chance to my own
-          hardware. I have an Intel Raptor Lake GPU + Nvidia RTX40xx GPU and ofc
-          I chose the intel.. becauuuseee its not that "blackbox" or "closed"
-          you can have ISA documentations, presentations, and also you can email
-          the developers about your questions :P
+          I started with ACO. I even made an ACO dump project :D. But I didn't
+          have an AMD GPU, so after a while I decided to give my own hardware a
+          chance. My laptop has an Intel Raptor Lake GPU and an NVIDIA RTX
+          40-series GPU, and ofc I picked Intel... becauuuseee it's much less of
+          a black box. You have ISA documentation, presentations, and developers
+          you can actually email with questions :P
         </p>
         <p>
-          So when I first started (I couldnt.. actually) with the BRW/ANV
-          ecosystem after very short time I noticed Jay, the project mostly
-          developed by
-          <a href="https://alyssarosenzweig.ca/">Alyssa Rosenzweig</a> and
-          Kenneth Graunke. So I noticed that is a newer project and probably
-          have moooar contribution surfaces than some mature driver or
-          compiler.. right? and it happened to be so. :)
+          When I first tried to get into BRW/ANV (well, <em>tried</em> :D), I
+          came across Jay, a newer project mostly developed by <a
+          href="https://alyssarosenzweig.ca/">Alyssa Rosenzweig</a> and Kenneth
+          Graunke. A newer compiler probably has moooar room for contributions
+          than a mature driver or compiler, right? Turns out I wasn't wrong :)
         </p>
         <p>
-          I have read some code inside Jay's codebase, looked at its important
-          files and tried to understand the architecture while I was also trying
-          to learn the ISA and the execution model of GFX12 GPUs from the ISA
-          documentations.
+          I started reading Jay's code, looking through the important files and
+          trying to get a feel for the architecture. At the same time, I was
+          learning the Gfx12 ISA and execution model from Intel's documentation.
         </p>
         <h2 id="why-jay">Why Jay is interesting</h2>
         <p>
-          It caught my attention because Jay is developed as an SSA-based shader
-          compiler with newer -imo better- heuristics so I tried to understand
-          it a bit more. I read the papers mentioned, understood the algorithms
-          and jay's IR model and the compiler's in-memory representation of
-          programs
+          Jay caught my attention because it's an SSA-based shader compiler with
+          some newer (and imo better) approaches to register allocation. I
+          wanted to understand how it worked, so I read the papers behind it and
+          dug into the algorithms, Jay's IR, and how it represents programs in
+          memory.
         </p>
         <p>
-          It first uses a spiller based on
-          <a href="https://pp.ipd.kit.edu/uploads/publikationen/braun09cc.pdf"
-            >Braun &amp; Hack's work on spilling and live-range splitting</a
-          >
-          to decide which values will be spilled to memory and then uses a
-          tree-scan register allocation algorithm based on
-          <a href="https://doi.org/10.1145/2038698.2038708">Colombet et al.</a>
-          to.. allocate the registers ofc. The spiller also draws on Braun et
-          al.'s "Simple and Efficient Construction of Static Single Assignment
-          Form" to keep things in ssa form as spilling introduces new
-          definitions. So even though NIR already comes in ssa, there's still
+          First, it uses a spiller based on <a
+          href="https://pp.ipd.kit.edu/uploads/publikationen/braun09cc.pdf">Braun
+          &amp; Hack's work on spilling and live-range splitting</a> to decide
+          which values need to be spilled to memory. Then it uses a tree-scan
+          register allocator based on <a
+          href="https://doi.org/10.1145/2038698.2038708">Colombet et al.</a>
+          to... allocate the registers, ofc :D. The spiller also draws on Braun
+          et al.'s "Simple and Efficient Construction of Static Single
+          Assignment Form" to keep things in SSA as spilling introduces new
+          definitions. So even though NIR already comes in SSA, there's still
           work to do here :D
         </p>
         <p>
           Jay uses a simpler per-lane SSA model and partitions the physical
-          register file by stride before assigning values to it. So most of the
-          compiler can work without dealing directly with all those Intel
+          register file by stride before assigning values to it. That way, most
+          of the compiler can work without directly dealing with all of Intel's
           regioning rules.
         </p>
         <p>
-          BRW is not ssa-based and it supports lots of different architectures
-          and over time it groweeeeed so MUCH. and for me its harder to follow,
-          implement new features, find bugs etc. But NIR is ssa, so why leave
-          that behind? Turns out the FS backend goes back to
-          <a
-            href="https://gitlab.freedesktop.org/mesa/mesa/-/commit/a1bebf73dfd"
-            >2010</a
-          >
-          and NIR came in
-          <a
-            href="https://gitlab.freedesktop.org/mesa/mesa/-/commit/30c4678f648"
-            >2014</a
-          >. They have separate IRs, so NIR being ssa doesn't mean BRW has to
-          be. But that still doesn't explain why BRW wasn't ssa-based in the
-          first place. The papers already existed back then.. what were the
+          BRW isn't SSA-based, and it supports a lot of different architectures.
+          Over time it grew... A LOT :D. For me, that makes it harder to follow,
+          add features to, and debug. But NIR is SSA, so why leave that behind?
+          Turns out the FS backend goes back to <a
+          href="https://gitlab.freedesktop.org/mesa/mesa/-/commit/a1bebf73dfd">2010</a>,
+          while NIR arrived in <a
+          href="https://gitlab.freedesktop.org/mesa/mesa/-/commit/30c4678f648">2014</a>.
+          They have separate IRs, so NIR being SSA doesn't mean BRW has to be.
+          Still, that doesn't explain why BRW wasn't SSA-based in the first
+          place. The papers already existed back then... what were the
           tradeoffs? idk, I'd like to understand that part too.
         </p>
         <p>
-          On 28.09.2026 at
-          <a href="https://indico.freedesktop.org/event/12/contributions/527/"
-            >XDC2026</a
-          >
-          (<a
-            href="https://indico.freedesktop.org/event/12/contributions/527/attachments/357/516/slides.pdf"
-            >slides</a
-          >,
-          <a href="https://www.youtube.com/watch?v=6tNGW8PoSzw&amp;t=14364s"
-            >video</a
-          >) Alyssa presented Jay, and a few days before that presentation jay
-          became the default compiler for Xe2 and Xe3 hw in Intel. Huge success
-          btw (<a
-            href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/44694"
-            >MR</a
-          >), hoping to have the same success for gfx12.
+          On 28 September 2026, Alyssa presented Jay at <a
+          href="https://indico.freedesktop.org/event/12/contributions/527/">XDC
+          2026</a> (<a
+          href="https://indico.freedesktop.org/event/12/contributions/527/attachments/357/516/slides.pdf">slides</a>,
+          <a
+          href="https://www.youtube.com/watch?v=6tNGW8PoSzw&amp;t=14364s">video</a>).
+          A few days before the presentation, Jay became the default compiler
+          for Xe2 and Xe3 hardware on Intel. Huge success btw (<a
+          href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/44694">MR</a>).
+          I hope we can get Gfx12 there too :)
         </p>
         <p>
-          Also, Alyssa's
-          <a href="https://indico.freedesktop.org/event/12/contributions/527/"
-            >XDC results</a
-          >
-          report 98% less spilling than BRW on a collection of game shaders.
-          Pretty exciting :D (those are her results, I haven't benchmarked my
-          gfx12 branch against BRW yet).
+          Alyssa's <a
+          href="https://indico.freedesktop.org/event/12/contributions/527/">XDC
+          results</a> also report 98% less spilling than BRW on a collection of
+          game shaders. Pretty exciting :D (those are her results; I haven't
+          benchmarked my Gfx12 branch against BRW yet).
         </p>
         <h2 id="getting-involved">Getting involved</h2>
         <p>
-          So as I said Jay got my interest. My first contribution to jay was
-          earlier, a
-          <a
-            href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42950"
-            >memory-leak fix</a
-          >. It was simple and I encountered it with tests while I was
-          experimenting with debug builds and sanitizers :D, literally a shader
-          allocation didn't use the 'memctx' it was meant to use. And its not
-          that easy to find newer bugs or contribution areas while you dont have
-          the hw.
+          As I said, Jay really caught my interest. My first contribution was
+          actually a small <a
+          href="https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/42950">memory-leak
+          fix</a>. I ran into it while experimenting with debug builds and
+          sanitizers :D. A shader allocation simply wasn't using the
+          <code>memctx</code> it was supposed to use. Finding new bugs or places
+          to contribute is a lot harder when you don't have the hardware,
+          though.
         </p>
         <p>
-          I was kinda sad about it and I decided to buy a new Xe3 hw laptop to
-          contribute on Jay because I like to work on GPUs, graphics and
-          compilers and low-level and high-performance systems and the idea of
-          helping the linux graphics ecosystem grow was another reason :) that
-          plan is always postponed to a later date and it literally helped me to
-          get working on mooar interesting areas about jay :))
+          I was kinda sad about that, and even decided to buy a new Xe3 laptop
+          to work on Jay. I love GPUs, graphics, compilers, and low-level
+          performance work, and helping the Linux graphics ecosystem grow made
+          it even more appealing :). That purchase keeps getting pushed back,
+          but it actually worked out pretty well: I ended up finding moooar
+          interesting things to do in Jay with the hardware I already had :))
         </p>
         <p>
-          Since I had some contributions in mesa and jay/brw I wanted to say Hi
-          to alyssa and my plan was asking her about some unowned work in jay so
-          that I can work and learn about Jay + that could offload some work
-          from the developers, and I also mentioned my plan about buying a new
-          laptop for development..
+          Since I'd already contributed to Mesa and Jay/BRW, I decided to say hi
+          to Alyssa. I wanted to ask whether there was any unowned work I could
+          take on, both to learn more about Jay and hopefully take some work off
+          the other developers' plates. I also mentioned my plan to buy a new
+          laptop for development.
         </p>
         <p>
-          Alyssa -she was like waiting for this moment- you have an older intel
-          igpu.. (because half a dozen people are already working on Xe2+ and
-          its their primary work to do rn). I guess I showed up at a good time
-          :)) the goal also included older hws back to skylake. Since I had a
-          gfx12 laptop, she sent me a branch that she worked on her free time
-          about gfx12.5 so I took that branch and I started implementing my
-          gfx12 branch on top of that. <em>foreshadowing</em>
-          it went well and is going well :)) An earlier CTS run had 4,534 passed
-          tests, now the FS8 run reaches 6,547 (I didn't record the older run's
-          SIMD setting, so not an exact before/after comparison).
+          And then came the funny part: I had an older Intel iGPU. A few people
+          were already working on Xe2+, but bringing Jay to older hardware, all
+          the way back to Skylake, was also a goal. I guess I showed up at a
+          good time :))
+        </p>
+        <p>
+          Since I had a Gfx12 laptop, she shared a branch she'd been working on
+          in her free time for Gfx12.5. I took that branch and started bringing
+          up Gfx12 on top of it. <em>foreshadowing</em>... it went well, and
+          it's still going well :)) An earlier CTS run had 4,534 passed tests;
+          the FS8 run now reaches 6,547 (I didn't record the older run's SIMD
+          setting, so this isn't an exact before/after comparison).
         </p>
         <p>
           I've mostly tested FS8 and FS16 so far. A lot of these fixes are in
-          shared compiler code, so they should help VS too, but I still need to
-          actually test it :D FS32 needs more work and testing as well.. we have
+          shared compiler code, so they should also help VS, but I still need to
+          actually test that :D. FS32 needs more work and testing too... we have
           a long way to go :)
         </p>
         <p>
-          Code:
-          <a
-            href="https://gitlab.freedesktop.org/emomaxd/mesa/-/tree/jay-gfx12-arl7"
-            >my Gfx12 branch</a
-          >.
+          Code: <a
+          href="https://gitlab.freedesktop.org/emomaxd/mesa/-/tree/jay-gfx12-arl7">my
+          Gfx12 branch</a>.
         </p>
         <p>
-          Thanks to
-          <a href="https://alyssarosenzweig.ca/">Alyssa Rosenzweig</a> for
-          sharing her work-in-progress branch, reviewing the patches, and
+          Thanks to <a href="https://alyssarosenzweig.ca/">Alyssa Rosenzweig</a>
+          for sharing her work-in-progress branch, reviewing the patches, and
           helping me find a useful starting point.
         </p>
         <h2 id="working-style">My working style</h2>
         <p>
-          I firstly started with vkcube and then fixed accumulators. After that
-          I had vkcube rendered in FS8 mode, then started going through CTS. An
-          earlier run got stuck at test #6,418 (divbyzero_frag), and after some
-          patches the latest FS8 run goes until 6,547 passed tests from a list
-          of 28,399. Also 1,901 NotSupported, then test #8,449 crashed
-          (helper_invocation.load_after_store). So 19,950 haven't run yet. Only
-          FS is using jay here, other stages still use brw.
+          I started with <code>vkcube</code> and fixed the accumulator issues
+          until it finally rendered in FS8. Then I moved on to CTS. An early run
+          got stuck at test #6,418 (<code>divbyzero_frag</code>). After a few
+          patches, the latest FS8 run reached 6,547 passed tests out of 28,399.
+          There were also 1,901 NotSupported results before test #8,449
+          (<code>helper_invocation.load_after_store</code>) crashed. That leaves
+          19,950 tests unrun. Only FS uses Jay in this setup; the other stages
+          still use BRW.
         </p>
         <p>
-          I hit a failed test on CTS then, if its a compiler assertion, run that
-          test with GDB, run and bt then select the frame in jay, print the nir
-          intrinsic name and figure out which part isn't handled yet, you know..
-          because it hit assertions... If its a misrender/miscompile instead, I
-          compare the outputs and generated ISA. I mostly check what and how BRW
-          handled that intrinsic and after I find the exact place that jay
-          implements it (ofc the place around the assertion, but sometimes it
-          may touch some other code too (see my partition patch)). Once I
-          understand what BRW is preparing and what Jay already handles,
-          sometimes the actual patch is almost trivial with jay abstractions :)
-          then rerun the test to see if I actually fixed it, plus related tests
-          and the relevant SIMD widths to check I didn't break something else.
+          My usual loop is to hit a CTS failure and figure out what happened. If
+          it's a compiler assertion, I run the failing test under GDB, get a
+          backtrace, jump into the Jay frame, and print the NIR intrinsic name
+          to see which path isn't handled yet. If it's a misrender or miscompile
+          instead, I compare the output and generated ISA.
         </p>
-        <h2 id="next">
-          This will be updated when a new milestone is achieved or maybe some
-          patches could be explained.. not promising that
-        </h2>
+        <p>
+          Then I check how BRW handles that intrinsic and find the corresponding
+          place in Jay. Sometimes the fix touches more than the code around the
+          assertion (see my partition patch). Once I understand what BRW
+          prepares and what Jay already handles, the actual patch can be almost
+          trivial thanks to Jay's abstractions :). Then I rerun the failing
+          test, related tests, and the relevant SIMD widths to make sure I
+          haven't broken something else.
+        </p>
+        <h2 id="next">What's next?</h2>
+        <p>
+          I'll update this when I hit another milestone, or maybe when there's
+          a patch worth writing about... no promises :D
+        </p>
         <ul>
           <li>FS8</li>
           <li>FS16</li>
